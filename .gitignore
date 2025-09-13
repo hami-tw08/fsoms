@@ -1,0 +1,41 @@
+# Logs & system
+*.log
+.DS_Store
+Thumbs.db
+
+# Laravel env
+.env
+.env.*
+!.env.example
+.env.backup
+.env.production
+.phpunit.result.cache
+.phpactor.json
+/.phpunit.cache
+
+# Laravel storage & cache
+/storage/*
+!storage/app/.gitignore
+!storage/framework/.gitignore
+!storage/logs/.gitignore
+/storage/*.key
+/storage/pail
+/bootstrap/cache/*
+!bootstrap/cache/.gitignore
+
+# Vendor / Node
+/vendor
+/node_modules
+/public/build
+/public/hot
+/public/storage
+
+# IDE & local configs
+/.idea
+/.vscode
+/.fleet
+/.nova
+/.zed
+/auth.json
+Homestead.json
+Homestead.yaml
