@@ -6,6 +6,16 @@
   {{-- daisyUI の .btn が overflow:hidden なのでカレンダー日セルは可視化 --}}
   <style>.daycell{ overflow:visible!important; }</style>
 
+  @php
+    // Controller から $minDate（Carbon）が来る想定。来ない場合は今日+3日で算出。
+    /** @var \Carbon\Carbon|string|null $minDate */
+    $___minDate = isset($minDate) ? \Carbon\Carbon::parse($minDate) : \Carbon\Carbon::today()->addDays(3);
+    $___minDateStr = $___minDate->toDateString();
+    $___minDateLabel = method_exists($___minDate,'isoFormat')
+      ? $___minDate->isoFormat('M月D日(ddd)')
+      : $___minDate->format('n月j日');
+  @endphp
+
   {{-- ヒーロー：キャッチ＋トップイメージ（md+はオーバーレイ、smは下に配置） --}}
   <div class="mb-8">
     <h1 class="text-xl md:text-2xl font-bold leading-tight mb-3">
@@ -65,9 +75,14 @@
   @endif
 
   {{-- 見出し：オンライン予約カレンダー --}}
-  <h2 class="text-lg md:text-xl font-bold mb-3">オンライン予約カレンダー</h2>
+  <div class="flex items-center gap-3 mb-3">
+    <h2 class="text-lg md:text-xl font-bold">オンライン予約カレンダー</h2>
+    <div class="badge badge-info badge-outline text-[11px] md:text-xs">
+      予約は {{ $___minDateLabel }} 以降が選べます
+    </div>
+  </div>
 
-  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6" id="calendarRoot" data-min-date="{{ $___minDateStr }}">
     {{-- 左：カレンダー（2カラム） --}}
     <div class="lg:col-span-2">
       <div class="card bg-base-100 shadow-xl overflow-x-auto">
@@ -90,22 +105,39 @@
                     @php
                       $rs = (int)($d['remain_store'] ?? 0);
                       $rd = (int)($d['remain_deliv'] ?? 0);
-                      $hasStore = $rs > 0;
-                      $hasDeliv = $rd > 0;
-                      $clickable = ($d['in_month'] ?? true) && ($hasStore || $hasDeliv);
+                      $hasStore   = $rs > 0;
+                      $hasDeliv   = $rd > 0;
+                      $beforeMin  = isset($d['before_min'])
+                                      ? (bool)$d['before_min']
+                                      : (\Carbon\Carbon::parse($d['date'])->lt($___minDate));
+                      $inMonth    = ($d['in_month'] ?? true);
+                      $clickable  = $inMonth && !$beforeMin && ($hasStore || $hasDeliv);
+                      $disabledReason = !$inMonth ? '当月外'
+                                        : ($beforeMin ? '3日前ルールにより選択不可'
+                                        : (!($hasStore || $hasDeliv) ? '空き枠なし' : ''));
                     @endphp
 
                     <button type="button"
-                      @if($clickable) data-date="{{ $d['date'] }}" @else disabled @endif
+                      @if($clickable)
+                        data-date="{{ $d['date'] }}"
+                      @else
+                        disabled
+                        title="{{ $disabledReason }}"
+                        aria-disabled="true"
+                      @endif
                       aria-label="{{ $d['date'] }} の空き状況：店{{ $hasStore ? 'あり' : 'なし' }} 配{{ $hasDeliv ? 'あり' : 'なし' }}"
                       class="daycell btn btn-ghost p-2 h-20 md:h-20 w-full text-left rounded-xl
-                             {{ !$d['in_month'] ? 'opacity-40' : '' }}
+                             {{ !$inMonth ? 'opacity-40' : '' }}
+                             {{ $beforeMin ? 'cursor-not-allowed opacity-40' : '' }}
                              {{ $clickable ? '' : 'cursor-not-allowed opacity-40' }}
                              {{ $d['is_today'] ? 'border border-primary' : '' }}"
                     >
                       {{-- 日付 --}}
                       <div class="w-full flex items-start justify-between">
                         <span class="text-xs md:text-sm font-medium">{{ $d['day'] }}</span>
+                        @if($beforeMin)
+                          <span class="badge badge-xs md:badge-sm badge-ghost">-3D</span>
+                        @endif
                       </div>
 
                       {{-- 店／配：smは縦並び、md+は横並び --}}
@@ -135,6 +167,7 @@
           <div class="mt-3 flex flex-wrap gap-2 items-center">
             <div class="badge badge-outline">カレンダーをクリックして日付を選択</div>
             <div class="text-xs opacity-70">○：枠あり / ×：枠なし</div>
+            <div class="text-xs opacity-70">※ {{ $___minDateLabel }} より前は選べません</div>
           </div>
         </div>
       </div>
@@ -149,7 +182,7 @@
           <div class="text-xs text-gray-600 space-y-1 mb-2">
             <div>ご予約のながれ：①カレンダーで日付を選択 → ②受取り方法 → ③時間 → ④商品選択へ</div>
             <div>店：店頭受取り　配：配送</div>
-            <div>×になっている場合は選択できません</div>
+            <div id="ruleHelper" class="opacity-80"></div>
           </div>
 
           {{-- 表示用のクイックフォーム（送信しない） --}}
@@ -182,6 +215,9 @@
             <input type="hidden" name="receive_method" id="receive_method">
             <input type="hidden" name="receive_date" id="receive_date">
             <input type="hidden" name="receive_time" id="receive_time">
+            {{-- 将来の予約一覧集計用に、開始/終了も同送しておく（今はController側で未使用でもOK） --}}
+            <input type="hidden" name="receive_time_start" id="receive_time_start">
+            <input type="hidden" name="receive_time_end" id="receive_time_end">
           </form>
 
           <div class="mt-3 text-xs text-gray-500">
@@ -313,19 +349,61 @@
   </div>
   {{-- ========= フル幅セクション終わり ========= --}}
 
-  {{-- JS：日付→方法→時間→【POSTでセッション保存】→Controllerでproducts.indexへリダイレクト --}}
+  {{-- JS：日付→方法→時間（法則でフィルタ）→【POSTでセッション保存】 --}}
   <script>
+    // ========= ルール定義 =========
+    // 法則1：曜日×方法ごとの時間帯
+    const RULES = {
+      delivery: {
+        WED_FRI:   ["12:00-14:00","16:00-17:00","18:30-19:30"],
+        THU_SAT_SUN:["10:00-11:00","12:00-14:00","16:00-17:00","18:30-19:30"]
+      },
+      store: {
+        WED_FRI:   ["14:00-16:00","17:00-18:30"],
+        THU_SAT_SUN:["11:00-12:00","14:00-16:00","17:00-18:30"]
+      }
+    };
+    // 法則2：表示すべき定員（UI表示用にサーバ残数があっても「表示」はこのルールを優先）
+    const RULE_CAPACITY = {
+      delivery: (range) => range === "12:00-14:00" ? 3 : 1,
+      store:    () => 3
+    };
+
+    function isoWeekday(dateStr){
+      // dateStr: YYYY-MM-DD -> 1(月)~7(日)
+      const d = new Date(dateStr + 'T00:00:00');
+      const js = d.getDay(); // 0=Sun,...6=Sat
+      return js === 0 ? 7 : js;
+    }
+    function ruleKeyByDow(dow){
+      if (dow === 3 || dow === 5) return 'WED_FRI';
+      if (dow === 4 || dow === 6 || dow === 7) return 'THU_SAT_SUN';
+      return null; // 月火は営業外
+    }
+    function toHHMM(s){ return (s||'').slice(0,5); }
+    function listAllowedRanges(dateStr, method){
+      const key = ruleKeyByDow(isoWeekday(dateStr));
+      if (!key) return [];
+      return (RULES[method]?.[key] ?? []).slice();
+    }
+
+    const calendarRoot = document.getElementById('calendarRoot');
+    const MIN_DATE = calendarRoot?.dataset?.minDate || '';
+
     const dayCells  = document.querySelectorAll('.daycell');
     const dateHidden= document.getElementById('selected_date');
     const dateLabel = document.getElementById('selected_date_label');
     const methodSel = document.getElementById('method');
     const timeSel   = document.getElementById('time');
+    const ruleHelper= document.getElementById('ruleHelper');
 
     // セッション保存用フォーム要素
     const metaForm  = document.getElementById('reserveMetaForm');
     const fMethod   = document.getElementById('receive_method');
     const fDate     = document.getElementById('receive_date');
     const fTime     = document.getElementById('receive_time');
+    const fTimeStart= document.getElementById('receive_time_start');
+    const fTimeEnd  = document.getElementById('receive_time_end');
 
     let selectedBtn = null;
 
@@ -334,11 +412,13 @@
       methodSel.disabled = true;
       timeSel.innerHTML = '<option value="" selected>先に受取り方法を選択</option>';
       timeSel.disabled = true;
+      ruleHelper.textContent = '';
     }
     function enableMethod() {
       methodSel.disabled = false;
       timeSel.disabled = true;
       timeSel.innerHTML = '<option value="" selected>先に受取り方法を選択</option>';
+      updateRuleHint();
     }
     function formatJPDate(iso) {
       if (!iso) return '';
@@ -346,11 +426,33 @@
       if (!y||!m||!d) return iso;
       return `${y}年${m}月${d}日`;
     }
+    function lt(a, b){ return a && b && a < b; } // 文字列YYYY-MM-DD同士
+
+    function updateRuleHint(){
+      const d = dateHidden.value, m = methodSel.value;
+      if (!d || !m) { ruleHelper.textContent = ''; return; }
+      const key = ruleKeyByDow(isoWeekday(d));
+      const ranges = listAllowedRanges(d, m);
+      const label = m === 'delivery' ? '配達' : '店頭受取';
+      const wk = {WED_FRI:'水・金', THU_SAT_SUN:'木・土・日'}[key] || '休業日';
+      if (ranges.length) {
+        ruleHelper.innerHTML = `選択日（${wk}）の<strong>${label}</strong>受付時間：${ranges.join(' / ')}`;
+      } else {
+        ruleHelper.textContent = 'この曜日は受付していません';
+      }
+    }
 
     dayCells.forEach(btn => {
       btn.addEventListener('click', () => {
         if (!btn.hasAttribute('data-date')) return;
         const date = btn.getAttribute('data-date');
+
+        // 念のためのクライアントガード（サーバでも検証される）
+        if (MIN_DATE && lt(date, MIN_DATE)) {
+          alert(`この日は選べません。${formatJPDate(MIN_DATE)} 以降を選択してください。`);
+          return;
+        }
+
         dateHidden.value = date;
         dateLabel.value  = formatJPDate(date);
 
@@ -362,53 +464,111 @@
         btn.classList.add('ring-2','ring-slate-400','ring-offset-1');
         btn.querySelector('.selected-mark')?.classList.remove('hidden');
 
-        // ★ 自動スクロールは削除（下に動かないようにする）
         enableMethod();
       });
     });
 
     methodSel.addEventListener('change', async () => {
       const d = dateHidden.value, m = methodSel.value;
+      updateRuleHint();
       timeSel.innerHTML = '';
       if (!d || !m) {
         timeSel.disabled = true;
         timeSel.innerHTML = '<option value="" selected>日付/方法の選択を確認してください</option>';
         return;
       }
+
       timeSel.disabled = true;
       timeSel.innerHTML = '<option value="" selected>読み込み中...</option>';
+
+      // サーバの実在枠（残数）を取得
+      let serverSlots = [];
       try {
         const res = await fetch(`/slots?date=${encodeURIComponent(d)}&slot_type=${encodeURIComponent(m)}`, {
           headers: { 'X-Requested-With': 'XMLHttpRequest' }
         });
-        const data = await res.json();
-        if (!Array.isArray(data) || data.length === 0) {
-          timeSel.disabled = true;
-          timeSel.innerHTML = '<option value="" selected>選択可能な時間がありません</option>';
-          return;
-        }
-        timeSel.innerHTML = '';
-        timeSel.appendChild(new Option('選択してください','',true,true));
-        for (const s of data) {
-          timeSel.appendChild(new Option(`${s.start_time} - ${s.end_time}（残り${s.remaining}）`, s.start_time));
-        }
-        timeSel.disabled = false;
-      } catch {
-        timeSel.disabled = true;
-        timeSel.innerHTML = '<option value="" selected>取得エラー。リロードしてください</option>';
+        serverSlots = await res.json();
+      } catch (e) {
+        serverSlots = [];
       }
+
+      // ルールに合う時間帯に「絞り込み」かつ「整列」
+      const allowed = listAllowedRanges(d, m);
+      const normalized = (serverSlots || []).map(s => ({
+        start: toHHMM(s.start_time),
+        end:   toHHMM(s.end_time),
+        remaining: (typeof s.remaining === 'number') ? s.remaining : null
+      }));
+
+      const intersection = allowed.map(range => {
+        const [st, en] = range.split('-');
+        const hit = normalized.find(x => x.start === st && x.end === en) || null;
+        return {
+          start: st,
+          end:   en,
+          serverRemaining: hit ? hit.remaining : null
+        };
+      });
+
+      // 表示構築（UIの表示数は「ルール」を優先。選択可否はサーバ残数で判定）
+      if (!intersection.length) {
+        timeSel.disabled = true;
+        timeSel.innerHTML = '<option value="" selected>選択可能な時間がありません</option>';
+        return;
+      }
+
+      timeSel.innerHTML = '';
+      timeSel.appendChild(new Option('選択してください','',true,true));
+
+      for (const s of intersection) {
+        const range = `${s.start}-${s.end}`;
+        const ruleCap = RULE_CAPACITY[m](range); // ★ 法則2：配達12-14=3 / その他=1、店頭=3
+        const sr = s.serverRemaining;
+
+        let text = `${range}（残り${ruleCap}）`; // 表示はルール優先
+        let disabled = false;
+
+        // サーバが満席（0）なら選べない
+        if (sr === 0) {
+          text = `${range}（満席）`;
+          disabled = true;
+        }
+        // サーバに実体が無い（null）の場合は準備中として選べない
+        if (sr === null) {
+          text = `${range}（準備中）`;
+          disabled = true;
+        }
+
+        const opt = new Option(text, range);
+        opt.dataset.start = s.start;
+        opt.dataset.end   = s.end;
+        opt.disabled = disabled;
+        timeSel.appendChild(opt);
+      }
+
+      timeSel.disabled = false;
     });
 
     // 時間選択後は Controller(ReservationController@storeCreateStep) にPOSTしてセッションへ保存
     timeSel.addEventListener('change', () => {
-      const d = dateHidden.value, m = methodSel.value, t = timeSel.value;
-      if (!d || !m || !t) return;
-      fDate.value   = d;
-      fMethod.value = m;
-      fTime.value   = t;
+      const d = dateHidden.value, m = methodSel.value, v = timeSel.value;
+      if (!d || !m || !v) return;
+      const [st,en] = v.split('-');
+
+      // 既存のController仕様に合わせつつ、将来用に start/end も同送
+      document.getElementById('receive_date').value       = d;
+      document.getElementById('receive_method').value     = m;
+      document.getElementById('receive_time').value       = st; // 既存は開始時刻のみ
+      document.getElementById('receive_time_start').value = st; // 将来の一覧集計用
+      document.getElementById('receive_time_end').value   = en;
+
       metaForm.submit();
     });
 
-    resetMethodAndTime();
+    // 初期化
+    (function init(){
+      methodSel.disabled = true;
+      timeSel.disabled = true;
+    })();
   </script>
 @endsection
