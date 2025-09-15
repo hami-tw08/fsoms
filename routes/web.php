@@ -26,11 +26,12 @@ Route::middleware('auth')->group(function () {
 // ゲストでもアクセス可能にする
 Route::get('/reserve', [ReservationController::class, 'create'])->name('reserve.create');
 Route::post('/reserve', [ReservationController::class, 'store'])->name('reserve.store');
-Route::post('/reserve/meta', [ReservationController::class, 'storeCreateStep'])
-    ->name('reserve.storeCreateStep');
+Route::post('/reserve/meta', [ReservationController::class, 'storeCreateStep'])->name('reserve.storeCreateStep');
 
 // 空き枠一覧（?date=YYYY-MM-DD&slot_type=store|delivery）
 Route::get('/slots', [SlotController::class, 'index'])->name('slots.index');
+
+// 商品
 Route::get('/products', [ProductController::class, 'index'])->name('products.index');
 Route::get('/products/{product:slug}', [ProductController::class, 'show'])->name('products.show');
 
@@ -43,20 +44,20 @@ Route::middleware([])->prefix('admin')->name('admin.')->group(function () {
     Route::delete('/products/{product}', [ProductController::class, 'destroy'])->name('products.destroy');
 });
 
-Route::post('/cart/add', [CartController::class, 'add'])->name('cart.add');        // 商品詳細から追加
-Route::patch('/cart/{rowId}', [CartController::class, 'update'])->name('cart.update'); // 数量変更
+// カート
+Route::post('/cart/add', [CartController::class, 'add'])->name('cart.add');             // 商品詳細から追加
+Route::patch('/cart/{rowId}', [CartController::class, 'update'])->name('cart.update');  // 数量変更
 Route::delete('/cart/{rowId}', [CartController::class, 'remove'])->name('cart.remove'); // 行削除
-Route::delete('/cart', [CartController::class, 'clear'])->name('cart.clear');      // 全クリア
-Route::get('/cart', [CartController::class, 'index'])->name('cart.index');         // 予約商品一覧
+Route::delete('/cart', [CartController::class, 'clear'])->name('cart.clear');           // 全クリア
+Route::get('/cart', [CartController::class, 'index'])->name('cart.index');              // 予約商品一覧
 
-// 配送先情報（次のページ）
+// Checkout: 配送先情報
 Route::get('/checkout/shipping', [CheckoutController::class, 'shipping'])->name('checkout.shipping');
 Route::post('/checkout/shipping', [CheckoutController::class, 'storeShipping'])->name('checkout.shipping.store');
 
-// === Checkout confirm & complete ===
-Route::get('/checkout/confirm', [\App\Http\Controllers\CheckoutController::class, 'confirm'])->name('checkout.confirm');
-Route::post('/checkout/complete', [\App\Http\Controllers\CheckoutController::class, 'complete'])->name('checkout.complete');
+// Checkout: 最終確認・確定・完了
+Route::get('/checkout/confirm', [CheckoutController::class, 'confirm'])->name('checkout.confirm');
+Route::post('/checkout/place', [CheckoutController::class, 'place'])->name('checkout.place');
+Route::get('/checkout/complete', [CheckoutController::class, 'complete'])->name('checkout.complete');
 
 require __DIR__.'/auth.php';
-
-
