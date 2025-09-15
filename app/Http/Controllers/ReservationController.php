@@ -108,4 +108,23 @@ class ReservationController extends Controller
         return redirect()->route('reserve.create', ['month' => $request->query('month')])
                          ->with('status', '予約を作成しました！');
     }
+
+    public function storeCreateStep(Request $request)
+    {
+        $validated = $request->validate([
+            'receive_method' => ['required','in:store,delivery'], // 店頭=store 配送=delivery
+            'receive_date'   => ['required','date'],
+            'receive_time'   => ['required'], // "10:00" 等
+        ]);
+
+        session()->put('reservation.meta', [
+            'method' => $validated['receive_method'],
+            'date'   => $validated['receive_date'],
+            'time'   => $validated['receive_time'],
+        ]);
+
+        // 商品選択画面へ（/products?date=... など既存のクエリがあれば付与してもOK）
+        return redirect()->route('products.index');
+    }
+
 }

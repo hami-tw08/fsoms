@@ -23,7 +23,7 @@
         <img src="{{ asset('img/top-image.png') }}" alt="トップイメージ"
              class="absolute inset-0 w-full h-full object-cover">
         <div class="absolute left-6 bottom-6">
-          <div class="bg-base-100/90 backdrop-blur shadow-xl rounded-box px-6 py-4 max-w-[52rem]">
+          <div class="bg-base-100/90 backdrop-blur shadow-xl rounded-box px-6 py-4 max-w=[52rem] max-w-[52rem]">
             <div class="text-lg font-bold mb-1">当店について</div>
             <div class="text-sm leading-relaxed">
               2027年に浪江でオープンした、1人で切り盛りする小さい花屋です。<br>
@@ -152,6 +152,7 @@
             <div>×になっている場合は選択できません</div>
           </div>
 
+          {{-- 表示用のクイックフォーム（送信しない） --}}
           <form id="quickReserveForm" onsubmit="return false;" class="space-y-4">
             @csrf
             <div class="form-control">
@@ -175,6 +176,14 @@
             </div>
           </form>
 
+          {{-- ★ セッション保存用の実フォーム（ReservationController@storeCreateStep へPOST） --}}
+          <form id="reserveMetaForm" method="POST" action="{{ route('reserve.storeCreateStep') }}" class="hidden">
+            @csrf
+            <input type="hidden" name="receive_method" id="receive_method">
+            <input type="hidden" name="receive_date" id="receive_date">
+            <input type="hidden" name="receive_time" id="receive_time">
+          </form>
+
           <div class="mt-3 text-xs text-gray-500">
             配達エリア：浪江 / 双葉 / 大熊 / 小高区
           </div>
@@ -193,7 +202,7 @@
           福島県　浪江町／南相馬市小高区／双葉町／大熊町 への配送承ります
         </p>
         <div class="text-sm md:text-base mt-2 space-y-1">
-          <p>＊浪江町内は配送料無料、その他の区、町への配送は900円頂戴します</p>
+          <p>＊配送は4,000円（税込）以上のお買い上げでご利用いただけます</p>
           <p>＊２日以内の配送はお電話にてご相談ください。お急ぎ配送料1,800円頂戴します（浪江含む）</p>
         </div>
       </div>
@@ -304,14 +313,19 @@
   </div>
   {{-- ========= フル幅セクション終わり ========= --}}
 
-  {{-- JS：日付→方法→時間→商品(index.blade.php)へジャンプ --}}
+  {{-- JS：日付→方法→時間→【POSTでセッション保存】→Controllerでproducts.indexへリダイレクト --}}
   <script>
-    const dayCells = document.querySelectorAll('.daycell');
-    const dateHidden = document.getElementById('selected_date');
-    const dateLabel  = document.getElementById('selected_date_label');
-    const methodSel  = document.getElementById('method');
-    const timeSel    = document.getElementById('time');
-    const PRODUCTS_INDEX_URL = "{{ url('/products') }}";
+    const dayCells  = document.querySelectorAll('.daycell');
+    const dateHidden= document.getElementById('selected_date');
+    const dateLabel = document.getElementById('selected_date_label');
+    const methodSel = document.getElementById('method');
+    const timeSel   = document.getElementById('time');
+
+    // セッション保存用フォーム要素
+    const metaForm  = document.getElementById('reserveMetaForm');
+    const fMethod   = document.getElementById('receive_method');
+    const fDate     = document.getElementById('receive_date');
+    const fTime     = document.getElementById('receive_time');
 
     let selectedBtn = null;
 
@@ -348,8 +362,8 @@
         btn.classList.add('ring-2','ring-slate-400','ring-offset-1');
         btn.querySelector('.selected-mark')?.classList.remove('hidden');
 
+        // ★ 自動スクロールは削除（下に動かないようにする）
         enableMethod();
-        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
       });
     });
 
@@ -385,11 +399,14 @@
       }
     });
 
+    // 時間選択後は Controller(ReservationController@storeCreateStep) にPOSTしてセッションへ保存
     timeSel.addEventListener('change', () => {
       const d = dateHidden.value, m = methodSel.value, t = timeSel.value;
       if (!d || !m || !t) return;
-      const params = new URLSearchParams({ date: d, method: m, time: t });
-      window.location.href = `${PRODUCTS_INDEX_URL}?${params.toString()}`;
+      fDate.value   = d;
+      fMethod.value = m;
+      fTime.value   = t;
+      metaForm.submit();
     });
 
     resetMethodAndTime();
