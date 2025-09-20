@@ -12,37 +12,41 @@ use Carbon\Carbon;
 
 class ReservationController extends Controller
 {
+    /**
+     * 予約トップ：月カレンダー＋残数表示
+     */
     public function create(Request $request)
     {
-        // 3日前ルール: 今日から3日後を最短予約日とする（例: 9/15なら 9/18 以降）
+        // 3日前ルール（例：9/15なら 9/18 以降）
         $minDate = Carbon::today()->addDays(3);
 
-        // 表示する月（?month=YYYY-MM）
+        // 表示月（?month=YYYY-MM）
         $month = $request->query('month');
         $firstDay = $month
             ? Carbon::createFromFormat('Y-m', $month)->startOfMonth()
             : Carbon::today()->startOfMonth();
 
+        // カレンダー表示範囲（週頭:月曜〜週末:日曜）
         $start = $firstDay->copy()->startOfWeek(Carbon::MONDAY);
         $end   = $firstDay->copy()->endOfMonth()->endOfWeek(Carbon::SUNDAY);
 
         // === 月内の空き枠残数（店頭/配達）を集計 ===
         $monthStart = $firstDay->copy()->startOfMonth()->toDateString();
         $monthEnd   = $firstDay->copy()->endOfMonth()->toDateString();
-        $shopId = 1; // 1店舗運用想定
+        $shopId = 1; // 1店舗運用
 
-        // capacity 合計 - 予約件数(booked/completed) を日付&slot_typeで集計
-        // さらに "3日前未満" は集計対象から除外（= 在庫0として扱われUI上選べなくなる）
+        // capacity 合計 - 予約件数(booked/completed) を日付×slot_typeで集計
+        // 3日前未満は除外（UI上は 0 扱い）
         $rows = DB::table('reservation_slots as s')
             ->leftJoin('reservations as r', function ($j) {
                 $j->on('r.slot_id', '=', 's.id')
-                  ->whereIn('r.status', ['booked','completed']);
+                  ->whereIn('r.status', ['booked', 'completed']);
             })
             ->where('s.shop_id', $shopId)
             ->whereBetween('s.slot_date', [$monthStart, $monthEnd])
             ->whereDate('s.slot_date', '>=', $minDate->toDateString()) // ★ 3日前未満を除外
             ->where('s.is_active', true)
-            ->groupBy('s.slot_date','s.slot_type')
+            ->groupBy('s.slot_date', 's.slot_type')
             ->get([
                 's.slot_date',
                 's.slot_type',
@@ -50,7 +54,7 @@ class ReservationController extends Controller
                 DB::raw('COUNT(r.id) as total_booked'),
             ]);
 
-        // stats['YYYY-MM-DD']['store'|'delivery'] = 残り数
+        // stats['YYYY-MM-DD']['store'|'delivery'] = 残数
         $stats = [];
         foreach ($rows as $row) {
             $remaining = (int)$row->total_capacity - (int)$row->total_booked;
@@ -67,17 +71,15 @@ class ReservationController extends Controller
             $week = [];
             for ($i = 0; $i < 7; $i++) {
                 $dateStr = $cursor->toDateString();
-
-                // 3日前未満フラグ（Bladeでボタン無効化やスタイル変更に利用可能）
-                $beforeMin = $cursor->lt($minDate);
+                $beforeMin = $cursor->lt($minDate); // 3日前未満
 
                 $week[] = [
                     'date'         => $dateStr,
                     'day'          => $cursor->day,
                     'in_month'     => $cursor->month === $firstDay->month,
                     'is_today'     => $cursor->isToday(),
-                    'before_min'   => $beforeMin, // ★ 追加
-                    // 集計結果は3日前未満を除外しているので、3日前未満は自動的に 0 となる
+                    'before_min'   => $beforeMin,
+                    // 集計は3日前未満を除外済み → 自然と 0
                     'remain_store' => $stats[$dateStr]['store']    ?? 0,
                     'remain_deliv' => $stats[$dateStr]['delivery'] ?? 0,
                 ];
@@ -89,7 +91,7 @@ class ReservationController extends Controller
         $prevMonth = $firstDay->copy()->subMonth()->format('Y-m');
         $nextMonth = $firstDay->copy()->addMonth()->format('Y-m');
 
-        // ★ minDate をビューへ（ガイダンス表示やJSガードに使用可）
+        // ★ view パスは resources/views/reserve/create.blade.php を想定
         return view('reserve.create', [
             'weeks'     => $weeks,
             'firstDay'  => $firstDay,
@@ -99,16 +101,20 @@ class ReservationController extends Controller
         ]);
     }
 
-    // 予約の登録
+    /**
+     * 本予約の登録（最終POST）
+     */
     public function store(StoreReservationRequest $request)
     {
         $slot = ReservationSlot::findOrFail($request->slot_id);
 
-        // ★ サーバ側ガード：スロット日付が today+3 未満なら弾く
+        // サーバ側 3日前ガード
         $minDate = Carbon::today()->addDays(3)->toDateString();
         if (Carbon::parse($slot->slot_date)->lt($minDate)) {
             return back()
-                ->withErrors(['slot_id' => '予約日は ' . Carbon::parse($minDate)->isoFormat('M月D日(ddd)') . ' 以降を選んでください。'])
+                ->withErrors([
+                    'slot_id' => '予約日は ' . Carbon::parse($minDate)->isoFormat('M月D日(ddd)') . ' 以降を選んでください。',
+                ])
                 ->withInput();
         }
 
@@ -119,44 +125,99 @@ class ReservationController extends Controller
             'slot_id'      => $slot->id,
             'user_id'      => optional($request->user())->id, // ゲストなら null
             'product_id'   => $product->id,
-            'quantity'     => $request->quantity,
+            'quantity'     => (int)$request->quantity,
             'total_amount' => $total,
             'status'       => 'booked',
             'notes'        => $request->notes,
-            // 配達枠のときだけ入力される想定（バリデーションで制御）
+            // 配達向け
             'delivery_area'        => $request->delivery_area,
             'delivery_postal_code' => $request->delivery_postal_code,
             'delivery_address'     => $request->delivery_address,
-            // ゲスト用の入力を使うなら（カラムを作っている場合のみ）
+            // ゲスト予約
             'guest_name'  => $request->guest_name,
             'guest_phone' => $request->guest_phone,
         ]);
 
-        return redirect()->route('reserve.create', ['month' => $request->query('month')])
-                         ->with('status', '予約を作成しました！');
+        return redirect()
+            ->route('reserve.create', ['month' => $request->query('month')])
+            ->with('status', '予約を作成しました！');
     }
 
+    /**
+     * カレンダー右側の“中間保存”POST（受取り方法・日付・時間）→ セッション保存
+     * Blade: <form id="reserveMetaForm" action="{{ route('reserve.storeCreateStep') }}">
+     */
     public function storeCreateStep(Request $request)
     {
-        // ★ 3日前ルールの適用
+        // 3日前ルール
         $minDate = Carbon::today()->addDays(3)->toDateString();
 
         $validated = $request->validate([
-            'receive_method' => ['required','in:store,delivery'], // 店頭=store 配送=delivery
-            'receive_date'   => ['required','date','after_or_equal:' . $minDate],
-            'receive_time'   => ['required'], // "10:00" 等
+            'receive_method'     => ['required', 'in:store,delivery'], // 店頭=store 配送=delivery
+            'receive_date'       => ['required', 'date', 'after_or_equal:' . $minDate],
+            'receive_time'       => ['required', 'date_format:H:i'],   // "10:00"
+            'receive_time_start' => ['nullable', 'date_format:H:i'],
+            'receive_time_end'   => ['nullable', 'date_format:H:i'],
         ], [
-            'receive_date.after_or_equal' => '受取日は ' . Carbon::parse($minDate)->isoFormat('M月D日(ddd)') . ' 以降を選んでください。',
+            'receive_date.after_or_equal' =>
+                '受取日は ' . Carbon::parse($minDate)->isoFormat('M月D日(ddd)') . ' 以降を選んでください。',
         ]);
 
+        // セッションへ保存（次画面の商品選択で利用想定）
         session()->put('reservation.meta', [
-            'method' => $validated['receive_method'],
-            'date'   => $validated['receive_date'],
-            'time'   => $validated['receive_time'],
+            'method'     => $validated['receive_method'],
+            'date'       => $validated['receive_date'],
+            'time'       => $validated['receive_time'],
+            'time_start' => $validated['receive_time_start'] ?? $validated['receive_time'],
+            'time_end'   => $validated['receive_time_end']   ?? null,
         ]);
 
-        // 商品選択画面へ（/products?date=... など既存のクエリがあれば付与してもOK）
-        return redirect()->route('products.index');
+        // まずは予約トップに戻して案内（products.index 未定義でも落ちない）
+        return redirect()
+            ->route('reserve.create', $request->only('month'))
+            ->with('status', '受取り情報を保存しました。商品選択へ進めます。');
+        // もし商品選択ルートがあるなら：
+        // return redirect()->route('products.index');
     }
 
+    /**
+     * 空き枠JSON（AJAX）
+     * GET /slots?date=YYYY-MM-DD&slot_type=store|delivery
+     * レスポンス: [{start_time,end_time,remaining}, ...]
+     */
+    public function slots(Request $request)
+    {
+        $request->validate([
+            'date'      => ['required', 'date'],
+            'slot_type' => ['required', 'in:store,delivery'],
+        ]);
+
+        $date = $request->query('date');
+        $type = $request->query('slot_type');
+
+        // 定義されている実枠（is_active=1）を取得
+        $rows = ReservationSlot::query()
+            ->where('slot_date', $date)
+            ->where('slot_type', $type)
+            ->where('is_active', true)
+            ->get(['start_time', 'end_time', 'capacity']);
+
+        // 各枠の予約数を差し引いて remaining を算出
+        $result = [];
+        foreach ($rows as $r) {
+            $booked = Reservation::query()
+                ->where('slot_id', $r->id)
+                ->whereIn('status', ['booked', 'completed'])
+                ->count();
+
+            $remaining = max(0, (int)$r->capacity - $booked);
+            $result[] = [
+                'start_time' => $r->start_time,
+                'end_time'   => $r->end_time,
+                'remaining'  => $remaining,
+            ];
+        }
+
+        return response()->json($result);
+    }
 }
