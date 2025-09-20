@@ -1,26 +1,36 @@
-<!doctype html>
-<html lang="ja">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>@yield('title', 'Namie Flower')</title>
+<!DOCTYPE html>
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="csrf-token" content="{{ csrf_token() }}">
 
-  <!-- Tailwind + daisyUI CDN（開発用） -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/daisyui@4.12.10/dist/full.min.js"></script>
-</head>
-<body class="bg-base-200 min-h-screen">
-  <div class="navbar bg-base-100 shadow">
-    <div class="container mx-auto px-4">
-      <a href="/" class="btn btn-ghost text-xl">Namie Flower</a>
-      <div class="ml-auto">
-        <a href="{{ route('products.index') }}" class="btn btn-sm">商品一覧</a>
-      </div>
-    </div>
-  </div>
+        <title>{{ config('app.name', 'Laravel') }}</title>
 
-  <main class="container mx-auto px-4 py-6">
-    @yield('content')
-  </main>
-</body>
+        <!-- Fonts -->
+        <link rel="preconnect" href="https://fonts.bunny.net">
+        <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
+
+        <!-- Scripts -->
+        @vite(['resources/css/app.css', 'resources/js/app.js'])
+    </head>
+    <body class="font-sans antialiased">
+        <div class="min-h-screen bg-gray-100">
+            @include('layouts.navigation')
+
+            <!-- Page Heading -->
+            @isset($header)
+                <header class="bg-white shadow">
+                    <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+                        {{ $header }}
+                    </div>
+                </header>
+            @endisset
+
+            <!-- Page Content -->
+            <main>
+                {{ $slot }}
+            </main>
+        </div>
+    </body>
 </html>

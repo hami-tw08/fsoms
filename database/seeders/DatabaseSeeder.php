@@ -26,11 +26,16 @@ class DatabaseSeeder extends Seeder
         }
 
         // ---- シーダー呼び出し順 ----
+        // 1. 管理者ユーザー（毎回上書き）
+        // 2. Product / DeliveryArea（あれば）/ ReservationSlot / Reservation
         $calls = [
+            AdminUserSeeder::class,
             ProductSeeder::class,
             ReservationSlotSeeder::class,
             ReservationSeeder::class,
         ];
+
+        // DeliveryAreaSeeder がある場合は AdminUserSeeder の直後へ差し込み
         if (class_exists(\Database\Seeders\DeliveryAreaSeeder::class)) {
             array_splice($calls, 1, 0, [DeliveryAreaSeeder::class]);
         }
