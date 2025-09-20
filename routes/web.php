@@ -3,11 +3,13 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ReservationController;
+use App\Http\Controllers\ProductController;
+use App\Http\Controllers\SlotController;
 
 // --- Admin Controllers ---
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\AdminReservationController;
-use App\Http\Controllers\Admin\SlotController;
+//use App\Http\Controllers\Admin\SlotController;
 
 /*
 |--------------------------------------------------------------------------
@@ -28,6 +30,11 @@ Route::controller(ReservationController::class)->group(function () {
     Route::post('/reserve/create-step', 'storeCreateStep')             // 中間保存POST
         ->name('reserve.storeCreateStep');
 });
+
+// 空き枠一覧（?date=YYYY-MM-DD&slot_type=store|delivery）
+Route::get('/slots', [SlotController::class, 'index'])->name('slots.index');
+Route::get('/products', [ProductController::class, 'index'])->name('products.index');
+Route::get('/products/{product}', [ProductController::class, 'show'])->name('products.show');
 
 // カレンダーが叩く空き枠AJAX（例：/slots?date=2025-09-28&slot_type=store）
 Route::get('/slots', [ReservationController::class, 'slots'])
