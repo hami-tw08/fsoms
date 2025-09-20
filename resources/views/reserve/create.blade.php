@@ -220,6 +220,19 @@
             <input type="hidden" name="receive_time_end" id="receive_time_end">
           </form>
 
+          {{-- ★ 新設：3項目そろったら有効になる Next 「リンク」ボタン（置き換え①） --}}
+          <div class="card-actions mt-2">
+            <a
+              id="nextLink"
+              href="{{ route('products.index') }}"
+              class="btn btn-primary w-full pointer-events-none opacity-50"
+              aria-disabled="true"
+              data-post-action="{{ route('reserve.storeCreateStep') }}"
+            >
+              次へ（商品選択へ進む）
+            </a>
+          </div>
+
           <div class="mt-3 text-xs text-gray-500">
             配達エリア：浪江 / 双葉 / 大熊 / 小高区
           </div>
@@ -316,7 +329,7 @@
             <div class="font-semibold mb-1">木、土、日</div>
             @foreach($slots as $i => $label)
               @php $val = $wkend[$i]; @endphp
-              <div class="text-sm py-1 flex items-center justify-between border-b border-base-200 last:border-0">
+              <div class="text-sm py-1 flex items中心 justify-between border-b border-base-200 last:border-0">
                 <span class="opacity-70">{{ $label }}</span>
                 <span class="{{ $val === 'オープン' ? 'text-red-600 font-semibold' : '' }}">{{ $val }}</span>
               </div>
@@ -349,10 +362,9 @@
   </div>
   {{-- ========= フル幅セクション終わり ========= --}}
 
-  {{-- JS：日付→方法→時間（法則でフィルタ）→【POSTでセッション保存】 --}}
+  {{-- JS：日付→方法→時間（法則でフィルタ）→【3項目揃ったらNextが有効→POSTでセッション保存→リンク遷移】 --}}
   <script>
     // ========= ルール定義 =========
-    // 法則1：曜日×方法ごとの時間帯
     const RULES = {
       delivery: {
         WED_FRI:   ["12:00-14:00","16:00-17:00","18:30-19:30"],
@@ -363,47 +375,36 @@
         THU_SAT_SUN:["11:00-12:00","14:00-16:00","17:00-18:30"]
       }
     };
-    // 法則2：表示すべき定員（UI表示用にサーバ残数があっても「表示」はこのルールを優先）
     const RULE_CAPACITY = {
       delivery: (range) => range === "12:00-14:00" ? 3 : 1,
       store:    () => 3
     };
 
-    function isoWeekday(dateStr){
-      // dateStr: YYYY-MM-DD -> 1(月)~7(日)
-      const d = new Date(dateStr + 'T00:00:00');
-      const js = d.getDay(); // 0=Sun,...6=Sat
-      return js === 0 ? 7 : js;
-    }
-    function ruleKeyByDow(dow){
-      if (dow === 3 || dow === 5) return 'WED_FRI';
-      if (dow === 4 || dow === 6 || dow === 7) return 'THU_SAT_SUN';
-      return null; // 月火は営業外
-    }
+    function isoWeekday(dateStr){ const d = new Date(dateStr + 'T00:00:00'); const js = d.getDay(); return js === 0 ? 7 : js; }
+    function ruleKeyByDow(dow){ if (dow===3||dow===5) return 'WED_FRI'; if (dow===4||dow===6||dow===7) return 'THU_SAT_SUN'; return null; }
     function toHHMM(s){ return (s||'').slice(0,5); }
-    function listAllowedRanges(dateStr, method){
-      const key = ruleKeyByDow(isoWeekday(dateStr));
-      if (!key) return [];
-      return (RULES[method]?.[key] ?? []).slice();
-    }
+    function listAllowedRanges(dateStr, method){ const key = ruleKeyByDow(isoWeekday(dateStr)); if (!key) return []; return (RULES[method]?.[key] ?? []).slice(); }
+    function formatJPDate(iso){ if(!iso) return ''; const [y,m,d]=iso.split('-').map(n=>parseInt(n,10)); return `${y}年${m}月${d}日`; }
+    function lt(a,b){ return a && b && a < b; }
 
     const calendarRoot = document.getElementById('calendarRoot');
     const MIN_DATE = calendarRoot?.dataset?.minDate || '';
 
-    const dayCells  = document.querySelectorAll('.daycell');
-    const dateHidden= document.getElementById('selected_date');
-    const dateLabel = document.getElementById('selected_date_label');
-    const methodSel = document.getElementById('method');
-    const timeSel   = document.getElementById('time');
-    const ruleHelper= document.getElementById('ruleHelper');
+    const dayCells   = document.querySelectorAll('.daycell');
+    const dateHidden = document.getElementById('selected_date');
+    const dateLabel  = document.getElementById('selected_date_label');
+    const methodSel  = document.getElementById('method');
+    const timeSel    = document.getElementById('time');
+    const ruleHelper = document.getElementById('ruleHelper');
+    const nextLink   = document.getElementById('nextLink');
 
-    // セッション保存用フォーム要素
-    const metaForm  = document.getElementById('reserveMetaForm');
-    const fMethod   = document.getElementById('receive_method');
-    const fDate     = document.getElementById('receive_date');
-    const fTime     = document.getElementById('receive_time');
-    const fTimeStart= document.getElementById('receive_time_start');
-    const fTimeEnd  = document.getElementById('receive_time_end');
+    // セッション保存用（POST）フォーム
+    const metaForm   = document.getElementById('reserveMetaForm');
+    const fMethod    = document.getElementById('receive_method');
+    const fDate      = document.getElementById('receive_date');
+    const fTime      = document.getElementById('receive_time');
+    const fTimeStart = document.getElementById('receive_time_start');
+    const fTimeEnd   = document.getElementById('receive_time_end');
 
     let selectedBtn = null;
 
@@ -413,21 +414,15 @@
       timeSel.innerHTML = '<option value="" selected>先に受取り方法を選択</option>';
       timeSel.disabled = true;
       ruleHelper.textContent = '';
+      updateNextButtonState();
     }
     function enableMethod() {
       methodSel.disabled = false;
       timeSel.disabled = true;
       timeSel.innerHTML = '<option value="" selected>先に受取り方法を選択</option>';
       updateRuleHint();
+      updateNextButtonState();
     }
-    function formatJPDate(iso) {
-      if (!iso) return '';
-      const [y,m,d] = iso.split('-').map(n=>parseInt(n,10));
-      if (!y||!m||!d) return iso;
-      return `${y}年${m}月${d}日`;
-    }
-    function lt(a, b){ return a && b && a < b; } // 文字列YYYY-MM-DD同士
-
     function updateRuleHint(){
       const d = dateHidden.value, m = methodSel.value;
       if (!d || !m) { ruleHelper.textContent = ''; return; }
@@ -435,24 +430,33 @@
       const ranges = listAllowedRanges(d, m);
       const label = m === 'delivery' ? '配達' : '店頭受取';
       const wk = {WED_FRI:'水・金', THU_SAT_SUN:'木・土・日'}[key] || '休業日';
-      if (ranges.length) {
-        ruleHelper.innerHTML = `選択日（${wk}）の<strong>${label}</strong>受付時間：${ranges.join(' / ')}`;
-      } else {
-        ruleHelper.textContent = 'この曜日は受付していません';
-      }
+      if (ranges.length) ruleHelper.innerHTML = `選択日（${wk}）の<strong>${label}</strong>受付時間：${ranges.join(' / ')}`;
+      else ruleHelper.textContent = 'この曜日は受付していません';
     }
 
+    function readyToProceed(){
+      const d = !!dateHidden.value;
+      const m = !!methodSel.value;
+      const t = !!timeSel.value && !timeSel.selectedOptions[0]?.disabled;
+      return d && m && t;
+    }
+    function updateNextButtonState(){
+      const ok = readyToProceed();
+      // <a>はdisabledが無いので見た目と挙動を手動で切替
+      nextLink.classList.toggle('pointer-events-none', !ok);
+      nextLink.classList.toggle('opacity-50', !ok);
+      nextLink.setAttribute('aria-disabled', String(!ok));
+    }
+
+    // カレンダー日クリック
     dayCells.forEach(btn => {
       btn.addEventListener('click', () => {
         if (!btn.hasAttribute('data-date')) return;
         const date = btn.getAttribute('data-date');
-
-        // 念のためのクライアントガード（サーバでも検証される）
         if (MIN_DATE && lt(date, MIN_DATE)) {
           alert(`この日は選べません。${formatJPDate(MIN_DATE)} 以降を選択してください。`);
           return;
         }
-
         dateHidden.value = date;
         dateLabel.value  = formatJPDate(date);
 
@@ -465,9 +469,11 @@
         btn.querySelector('.selected-mark')?.classList.remove('hidden');
 
         enableMethod();
+        updateNextButtonState();
       });
     });
 
+    // 受取り方法変更 → 時間帯読込
     methodSel.addEventListener('change', async () => {
       const d = dateHidden.value, m = methodSel.value;
       updateRuleHint();
@@ -475,13 +481,14 @@
       if (!d || !m) {
         timeSel.disabled = true;
         timeSel.innerHTML = '<option value="" selected>日付/方法の選択を確認してください</option>';
+        updateNextButtonState();
         return;
       }
 
       timeSel.disabled = true;
       timeSel.innerHTML = '<option value="" selected>読み込み中...</option>';
 
-      // サーバの実在枠（残数）を取得
+      // サーバの実在枠を取得
       let serverSlots = [];
       try {
         const res = await fetch(`/slots?date=${encodeURIComponent(d)}&slot_type=${encodeURIComponent(m)}`, {
@@ -492,7 +499,6 @@
         serverSlots = [];
       }
 
-      // ルールに合う時間帯に「絞り込み」かつ「整列」
       const allowed = listAllowedRanges(d, m);
       const normalized = (serverSlots || []).map(s => ({
         start: toHHMM(s.start_time),
@@ -503,17 +509,13 @@
       const intersection = allowed.map(range => {
         const [st, en] = range.split('-');
         const hit = normalized.find(x => x.start === st && x.end === en) || null;
-        return {
-          start: st,
-          end:   en,
-          serverRemaining: hit ? hit.remaining : null
-        };
+        return { start: st, end: en, serverRemaining: hit ? hit.remaining : null };
       });
 
-      // 表示構築（UIの表示数は「ルール」を優先。選択可否はサーバ残数で判定）
       if (!intersection.length) {
         timeSel.disabled = true;
         timeSel.innerHTML = '<option value="" selected>選択可能な時間がありません</option>';
+        updateNextButtonState();
         return;
       }
 
@@ -521,54 +523,85 @@
       timeSel.appendChild(new Option('選択してください','',true,true));
 
       for (const s of intersection) {
-        const range = `${s.start}-${s.end}`;
-        const ruleCap = RULE_CAPACITY[m](range); // ★ 法則2：配達12-14=3 / その他=1、店頭=3
+        const range  = `${s.start}-${s.end}`;
+        const ruleCap = RULE_CAPACITY[m](range);
         const sr = s.serverRemaining;
 
-        let text = `${range}（残り${ruleCap}）`; // 表示はルール優先
+        let text = `${range}（残り${ruleCap}）`;
         let disabled = false;
 
-        // サーバが満席（0）なら選べない
-        if (sr === 0) {
-          text = `${range}（満席）`;
-          disabled = true;
-        }
-        // サーバに実体が無い（null）の場合は準備中として選べない
-        if (sr === null) {
-          text = `${range}（準備中）`;
-          disabled = true;
-        }
+        if (sr === 0) { text = `${range}（満席）`; disabled = true; }
+        if (sr === null){ text = `${range}（準備中）`; disabled = true; }
 
         const opt = new Option(text, range);
-        opt.dataset.start = s.start;
-        opt.dataset.end   = s.end;
+        opt.dataset.start = s.start; opt.dataset.end = s.end;
         opt.disabled = disabled;
         timeSel.appendChild(opt);
       }
 
       timeSel.disabled = false;
+      updateNextButtonState();
     });
 
-    // 時間選択後は Controller(ReservationController@storeCreateStep) にPOSTしてセッションへ保存
+    // 時間選択：hiddenへ値をセット（送信はまだしない）
     timeSel.addEventListener('change', () => {
       const d = dateHidden.value, m = methodSel.value, v = timeSel.value;
-      if (!d || !m || !v) return;
+      if (!d || !m || !v) { updateNextButtonState(); return; }
       const [st,en] = v.split('-');
 
-      // 既存のController仕様に合わせつつ、将来用に start/end も同送
-      document.getElementById('receive_date').value       = d;
-      document.getElementById('receive_method').value     = m;
-      document.getElementById('receive_time').value       = st; // 既存は開始時刻のみ
-      document.getElementById('receive_time_start').value = st; // 将来の一覧集計用
-      document.getElementById('receive_time_end').value   = en;
+      fDate.value = d;
+      fMethod.value = m;
+      fTime.value = st;
+      fTimeStart.value = st;
+      fTimeEnd.value = en;
 
-      metaForm.submit();
+      updateNextButtonState();
+    });
+
+    // 「次へ」クリック：3項目そろっていれば POST → href へ遷移（置き換え②）
+    nextLink.addEventListener('click', async (e) => {
+      if (!readyToProceed()) { e.preventDefault(); return; }
+      e.preventDefault();
+
+      // 念のため hidden 値を最終セット
+      if (!fDate.value || !fMethod.value || !fTime.value) {
+        const v = timeSel.value || '';
+        if (v) {
+          const [st, en] = v.split('-');
+          fDate.value = dateHidden.value;
+          fMethod.value = methodSel.value;
+          fTime.value = st;
+          fTimeStart.value = st;
+          fTimeEnd.value = en;
+        }
+      }
+
+      const token = document.querySelector('#reserveMetaForm input[name="_token"]')?.value || '';
+
+      try {
+        await fetch(nextLink.dataset.postAction, {
+          method: 'POST',
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-TOKEN': token,
+          },
+          body: new FormData(metaForm),
+          redirect: 'follow',
+        });
+      } catch (_) {
+        // 保存失敗時は遷移を中断（必要に応じてトースト等）
+        return;
+      }
+
+      // productsへ遷移
+      window.location.href = nextLink.href;
     });
 
     // 初期化
     (function init(){
       methodSel.disabled = true;
       timeSel.disabled = true;
+      updateNextButtonState();
     })();
   </script>
 @endsection

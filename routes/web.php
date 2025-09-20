@@ -9,7 +9,6 @@ use App\Http\Controllers\SlotController;
 // --- Admin Controllers ---
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\AdminReservationController;
-//use App\Http\Controllers\Admin\SlotController;
 
 /*
 |--------------------------------------------------------------------------
@@ -24,24 +23,20 @@ use App\Http\Controllers\Admin\AdminReservationController;
 Route::redirect('/', '/reserve');
 
 // 予約（画面表示／最終POST／中間POST: 日付・方法・時間をセッション保存）
-Route::controller(ReservationController::class)->group(function () {
-    Route::get('/reserve', 'create')->name('reserve.create');          // 画面表示
-    Route::post('/reserve', 'store')->name('reserve.store');           // 最終予約POST
-    Route::post('/reserve/create-step', 'storeCreateStep')             // 中間保存POST
-        ->name('reserve.storeCreateStep');
-    Route::get('/reserve', [ReservationController::class, 'create'])->name('reserve.create');
-    Route::post('/reserve', [ReservationController::class, 'store'])->name('reserve.store');
-    Route::get('/slots', [ReservationController::class, 'slots'])->name('reserve.slots');
-});
+Route::get('/reserve', [ReservationController::class, 'create'])->name('reserve.create');   // 画面表示
+Route::post('/reserve', [ReservationController::class, 'store'])->name('reserve.store');    // 最終予約POST
+Route::post('/reserve/create-step', [ReservationController::class, 'storeCreateStep'])
+    ->name('reserve.storeCreateStep'); // 中間保存POST（時間選択後にここへPOST）
 
-// 空き枠一覧（?date=YYYY-MM-DD&slot_type=store|delivery）
-Route::get('/slots', [SlotController::class, 'index'])->name('slots.index');
+
+// ▼ カレンダーが叩く空き枠AJAX（例：/slots?date=2025-09-28&slot_type=store|delivery）
+//   Public側の /slots は ReservationController@slots のみに統一（JSON返却想定）
+Route::get('/slots', [ReservationController::class, 'slots'])->name('public.slots');
+
+// ▼ 商品（時間確定後に遷移）
 Route::get('/products', [ProductController::class, 'index'])->name('products.index');
 Route::get('/products/{product}', [ProductController::class, 'show'])->name('products.show');
 
-// カレンダーが叩く空き枠AJAX（例：/slots?date=2025-09-28&slot_type=store）
-Route::get('/slots', [ReservationController::class, 'slots'])
-    ->name('public.slots'); // admin配下と名前が被らないように
 
 /**
  * Authenticated pages
@@ -50,12 +45,13 @@ Route::get('/dashboard', function () {
     return view('dashboard');
 })->middleware(['auth', 'verified'])->name('dashboard');
 
-// 必要ならプロフィールを有効化（今はコメントアウトのままでもOK）
+// 必要ならプロフィールを有効化（今はコメントアウトでもOK）
 // Route::middleware('auth')->group(function () {
 //     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
 //     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
 //     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 // });
+
 
 /*
 |--------------------------------------------------------------------------
@@ -69,7 +65,7 @@ Route::middleware(['auth', 'is_admin'])
         Route::get('/', DashboardController::class)->name('dashboard');
         Route::get('/reservations', [AdminReservationController::class, 'index'])->name('reservations.index');
 
-        // 管理用の枠一覧/トグル（既存）
+        // 管理用の枠一覧/トグル（SlotControllerは Admin配下のURLに限定）
         Route::get('/slots', [SlotController::class, 'index'])->name('slots.index');
         Route::post('/slots/{id}/toggle', [SlotController::class, 'toggle'])->name('slots.toggle');
     });
