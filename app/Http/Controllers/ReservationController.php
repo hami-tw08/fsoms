@@ -35,8 +35,6 @@ class ReservationController extends Controller
         $monthEnd   = $firstDay->copy()->endOfMonth()->toDateString();
         $shopId = 1; // 1店舗運用
 
-        // capacity 合計 - 予約件数(booked/completed) を日付×slot_typeで集計
-        // 3日前未満は除外（UI上は 0 扱い）
         $rows = DB::table('reservation_slots as s')
             ->leftJoin('reservations as r', function ($j) {
                 $j->on('r.slot_id', '=', 's.id')
@@ -183,7 +181,7 @@ class ReservationController extends Controller
     /**
      * 空き枠JSON（AJAX）
      * GET /slots?date=YYYY-MM-DD&slot_type=store|delivery
-     * レスポンス: [{start_time,end_time,remaining}, ...]
+     * レスポンス: [{id,start_time,end_time,remaining}, ...]
      */
     public function slots(Request $request)
     {
@@ -194,30 +192,37 @@ class ReservationController extends Controller
 
         $date = $request->query('date');
         $type = $request->query('slot_type');
-
-        // 定義されている実枠（is_active=1）を取得
-        $rows = ReservationSlot::query()
-            ->where('slot_date', $date)
-            ->where('slot_type', $type)
-            ->where('is_active', true)
-            ->get(['start_time', 'end_time', 'capacity']);
-
-        // 各枠の予約数を差し引いて remaining を算出
-        $result = [];
-        foreach ($rows as $r) {
-            $booked = Reservation::query()
-                ->where('slot_id', $r->id)
-                ->whereIn('status', ['booked', 'completed'])
-                ->count();
-
-            $remaining = max(0, (int)$r->capacity - $booked);
-            $result[] = [
-                'start_time' => $r->start_time,
-                'end_time'   => $r->end_time,
-                'remaining'  => $remaining,
-            ];
+        if (!$date || !in_array($type, ['store','delivery'], true)) {
+            return response()->json([], 400);
         }
 
-        return response()->json($result);
+        $shopId = 1; // 1店舗運用前提
+
+        // 3日前未満は返さない（フロントの制御と合わせる）
+        $minDate = Carbon::today()->addDays(3)->toDateString();
+        if (Carbon::parse($date)->lt($minDate)) {
+            return response()->json([]);
+        }
+
+        // 定義されている実枠（is_active=1）と予約を突き合わせて残数を返す
+        $rows = DB::table('reservation_slots as s')
+            ->leftJoin('reservations as r', function ($j) {
+                $j->on('r.slot_id', '=', 's.id')
+                  ->whereIn('r.status', ['booked','completed']);
+            })
+            ->where('s.shop_id', $shopId)
+            ->where('s.slot_date', $date)
+            ->where('s.slot_type', $type)
+            ->where('s.is_active', true)
+            ->groupBy('s.id','s.start_time','s.end_time','s.capacity')
+            ->orderBy('s.start_time')
+            ->get([
+                's.id',
+                's.start_time',
+                's.end_time',
+                DB::raw('GREATEST(s.capacity - COUNT(r.id), 0) as remaining'),
+            ]);
+
+        return response()->json($rows);
     }
 }

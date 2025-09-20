@@ -29,6 +29,9 @@ Route::controller(ReservationController::class)->group(function () {
     Route::post('/reserve', 'store')->name('reserve.store');           // 最終予約POST
     Route::post('/reserve/create-step', 'storeCreateStep')             // 中間保存POST
         ->name('reserve.storeCreateStep');
+    Route::get('/reserve', [ReservationController::class, 'create'])->name('reserve.create');
+    Route::post('/reserve', [ReservationController::class, 'store'])->name('reserve.store');
+    Route::get('/slots', [ReservationController::class, 'slots'])->name('reserve.slots');
 });
 
 // 空き枠一覧（?date=YYYY-MM-DD&slot_type=store|delivery）
