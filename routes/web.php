@@ -11,6 +11,7 @@ use App\Http\Controllers\CheckoutController;
 // --- Admin Controllers ---
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\AdminReservationController;
+use App\Http\Controllers\Admin\ProductController as AdminProductController;
 
 /*
 |--------------------------------------------------------------------------
@@ -77,6 +78,11 @@ Route::middleware(['auth', 'is_admin'])
 
         Route::get('/slots', [\App\Http\Controllers\SlotController::class, 'index'])->name('slots.index');
         Route::post('/slots/{id}/toggle', [\App\Http\Controllers\SlotController::class, 'toggle'])->name('slots.toggle');
+    });
+
+    Route::prefix('admin')->name('admin.')->group(function () {
+    Route::get('/', fn() => redirect()->route('admin.products.index'))->name('dashboard');
+    Route::resource('products', AdminProductController::class)->except(['show']);
     });
 
 require __DIR__ . '/auth.php';
