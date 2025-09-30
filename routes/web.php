@@ -1,10 +1,12 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\ProfileController;
-use App\Http\Controllers\ReservationController;
+use Illuminate\Http\Request;
+
 use App\Http\Controllers\ProductController;
-use App\Http\Controllers\SlotController;
+use App\Http\Controllers\ReservationController;
+use App\Http\Controllers\CartController;
+use App\Http\Controllers\CheckoutController;
 
 // --- Admin Controllers ---
 use App\Http\Controllers\Admin\DashboardController;
@@ -16,48 +18,56 @@ use App\Http\Controllers\Admin\AdminReservationController;
 |--------------------------------------------------------------------------
 */
 
-/**
- * Public
- */
-// トップは予約画面へ
+/** Public */
+// トップ→予約トップ
 Route::redirect('/', '/reserve');
 
-// 予約（画面表示／最終POST／中間POST: 日付・方法・時間をセッション保存）
-Route::get('/reserve', [ReservationController::class, 'create'])->name('reserve.create');   // 画面表示
-Route::post('/reserve', [ReservationController::class, 'store'])->name('reserve.store');    // 最終予約POST
-Route::post('/reserve/create-step', [ReservationController::class, 'storeCreateStep'])
-    ->name('reserve.storeCreateStep'); // 中間保存POST（時間選択後にここへPOST）
+// 予約フロー
+Route::get('/reserve', [ReservationController::class, 'create'])->name('reserve.create');
+Route::post('/reserve', [ReservationController::class, 'store'])->name('reserve.store');
+Route::post('/reserve/create-step', [ReservationController::class, 'storeCreateStep'])->name('reserve.storeCreateStep');
 
-
-// ▼ カレンダーが叩く空き枠AJAX（例：/slots?date=2025-09-28&slot_type=store|delivery）
-//   Public側の /slots は ReservationController@slots のみに統一（JSON返却想定）
+// 空き枠API
 Route::get('/slots', [ReservationController::class, 'slots'])->name('public.slots');
 
-// ▼ 商品（時間確定後に遷移）
+// 商品（slug運用）
 Route::get('/products', [ProductController::class, 'index'])->name('products.index');
-Route::get('/products/{product}', [ProductController::class, 'show'])->name('products.show');
+Route::get('/products/{product:slug}', [ProductController::class, 'show'])
+    ->where('product', '[A-Za-z0-9\-_]+')
+    ->name('products.show');
 
+// レガシーIDURLの救済（任意）
+Route::get('/products/{id}', function (int $id) {
+    $p = \App\Models\Product::findOrFail($id);
+    return redirect()->route('products.show', ['product' => $p->slug], 301);
+})->whereNumber('id');
 
-/**
- * Authenticated pages
- */
-Route::get('/dashboard', function () {
-    return view('dashboard');
-})->middleware(['auth', 'verified'])->name('dashboard');
+// === 予約一覧（cart） ===
+Route::get('/cart', [CartController::class, 'index'])->name('cart.index');              // 一覧表示
+Route::post('/cart/add', [CartController::class, 'add'])->name('cart.add');             // 商品追加（show.bladeからPOST）
+Route::patch('/cart/{rowId}', [CartController::class, 'update'])->name('cart.update');  // 数量更新
+Route::delete('/cart/{rowId}', [CartController::class, 'remove'])->name('cart.remove'); // 削除
+Route::delete('/cart', [CartController::class, 'clear'])->name('cart.clear');           // 全削除
 
-// 必要ならプロフィールを有効化（今はコメントアウトでもOK）
-// Route::middleware('auth')->group(function () {
-//     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
-//     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
-//     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
-// });
+// === チェックアウト ===
+// 配送先情報（入力）
+Route::get('/checkout/shipping', [CheckoutController::class, 'shipping'])->name('checkout.shipping');
+// 配送先情報の保存（shipping.blade.php の form 送信先）
+Route::post('/checkout/shipping', [CheckoutController::class, 'storeShipping'])->name('checkout.shipping.store');
 
+// 最終確認（confirm.blade.php へ）
+Route::get('/checkout/confirm', [CheckoutController::class, 'confirm'])->name('checkout.confirm');
 
-/*
-|--------------------------------------------------------------------------
-| Admin Routes (/admin)
-|--------------------------------------------------------------------------
-*/
+// 確定（POST）
+Route::post('/checkout/place', [CheckoutController::class, 'place'])->name('checkout.place');
+
+// 完了画面
+Route::get('/checkout/complete', [CheckoutController::class, 'complete'])->name('checkout.complete');
+
+/** 認証後ページ */
+Route::get('/dashboard', fn () => view('dashboard'))->middleware(['auth', 'verified'])->name('dashboard');
+
+/** Admin */
 Route::middleware(['auth', 'is_admin'])
     ->prefix('admin')
     ->name('admin.')
@@ -65,9 +75,8 @@ Route::middleware(['auth', 'is_admin'])
         Route::get('/', DashboardController::class)->name('dashboard');
         Route::get('/reservations', [AdminReservationController::class, 'index'])->name('reservations.index');
 
-        // 管理用の枠一覧/トグル（SlotControllerは Admin配下のURLに限定）
-        Route::get('/slots', [SlotController::class, 'index'])->name('slots.index');
-        Route::post('/slots/{id}/toggle', [SlotController::class, 'toggle'])->name('slots.toggle');
+        Route::get('/slots', [\App\Http\Controllers\SlotController::class, 'index'])->name('slots.index');
+        Route::post('/slots/{id}/toggle', [\App\Http\Controllers\SlotController::class, 'toggle'])->name('slots.toggle');
     });
 
 require __DIR__ . '/auth.php';

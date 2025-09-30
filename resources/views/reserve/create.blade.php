@@ -17,20 +17,22 @@
   @endphp
 
   {{-- ヒーロー：キャッチ＋トップイメージ（md+はオーバーレイ、smは下に配置） --}}
-  <div class="mb-8">
-    <h1 class="text-xl md:text-2xl font-bold leading-tight mb-3">
-      日々の暮らしに添える花<br class="hidden sm:block">大切な方に贈る花
-    </h1>
+  <!-- <div class="mb-8"> -->
+    <!-- <h1 class="text-xl md:text-2xl font-bold leading-tight mb-3"> -->
+      <!-- 日々の暮らしに添える花<br class="hidden sm:block">大切な方に贈る花 -->
+    <!-- </h1> -->
 
-    {{-- 画像：スマホは全体表示、md+ はヒーロー演出 --}}
-    <div class="rounded-2xl overflow-hidden">
-      {{-- sm（〜md-1）：横幅フィット＆全体表示 --}}
-      <img src="{{ asset('img/top-image.png') }}" alt="トップイメージ"
-           class="block md:hidden w-full h-auto object-contain">
+{{-- 画像：スマホは全体表示、md+ はヒーロー演出 --}}
+<div class="rounded-2xl overflow-hidden">
+  {{-- sm（〜md-1）：横幅フィット＆全体表示 --}}
+  <img src="{{ asset('img/top-image2.png') }}" alt="トップイメージ"
+       class="block md:hidden w-full h-auto object-contain rounded-2xl">
+</div>
+
 
       {{-- md+：固定高＋cover＋オーバーレイ --}}
       <div class="hidden md:block relative h-80 lg:h-96">
-        <img src="{{ asset('img/top-image.png') }}" alt="トップイメージ"
+        <img src="{{ asset('img/top-image2.png') }}" alt="トップイメージ"
              class="absolute inset-0 w-full h-full object-cover">
         <div class="absolute left-6 bottom-6">
           <div class="bg-base-100/90 backdrop-blur shadow-xl rounded-box px-6 py-4 max-w=[52rem] max-w-[52rem]">
@@ -74,13 +76,28 @@
     <div class="alert alert-success mb-4">{{ session('status') }}</div>
   @endif
 
-  {{-- 見出し：オンライン予約カレンダー --}}
+  {{-- 見出し：オンライン予約 --}}
   <div class="flex items-center gap-3 mb-3">
-    <h2 class="text-lg md:text-xl font-bold">オンライン予約カレンダー</h2>
+    <h2 class="text-lg md:text-xl font-bold">オンライン予約</h2>
     <div class="badge badge-info badge-outline text-[11px] md:text-xs">
       予約は {{ $___minDateLabel }} 以降が選べます
     </div>
   </div>
+
+{{-- ★ ステッパー（横並び・中央寄せ） --}}
+@php
+  $__steps = ['予約日時・受取り方法','商品の選択','予約者情報の入力','入力情報の確認','予約完了'];
+@endphp
+<div class="overflow-x-auto mb-4">
+  <x-stepper
+    :steps="$__steps"
+    :current="1"
+    :verticalOnSm="false"
+    :showLabels="true"
+    class="justify-center w-full mx-auto max-w-4xl gap-3 min-w-max" />
+</div>
+
+
 
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-6" id="calendarRoot" data-min-date="{{ $___minDateStr }}">
     {{-- 左：カレンダー（2カラム） --}}
@@ -180,7 +197,7 @@
           <h3 class="card-title">予約フォーム</h3>
 
           <div class="text-xs text-gray-600 space-y-1 mb-2">
-            <div>ご予約のながれ：①カレンダーで日付を選択 → ②受取り方法 → ③時間 → ④商品選択へ</div>
+            <div>ご予約のながれ：①カレンダーで日付を選択 → ②受取り方法を選択 → ③受取り希望時間を選択 → ④商品選択へ</div>
             <div>店：店頭受取り　配：配送</div>
             <div id="ruleHelper" class="opacity-80"></div>
           </div>
@@ -248,11 +265,11 @@
       <div class="card-body py-4">
         <h3 class="text-base md:text-lg font-bold">配送について</h3>
         <p class="text-sm md:text-base mt-1">
-          福島県　浪江町／南相馬市小高区／双葉町／大熊町 への配送承ります
+          福島県浪江町／南相馬市小高区／双葉町／大熊町 への配送を承ります
         </p>
         <div class="text-sm md:text-base mt-2 space-y-1">
           <p>＊配送は4,000円（税込）以上のお買い上げでご利用いただけます</p>
-          <p>＊２日以内の配送はお電話にてご相談ください。お急ぎ配送料1,800円頂戴します（浪江含む）</p>
+          <p>＊２日以内の配送はお電話にてご相談ください。お急ぎ配送料1,800円頂戴します</p>
         </div>
       </div>
     </div>
@@ -363,245 +380,244 @@
   {{-- ========= フル幅セクション終わり ========= --}}
 
   {{-- JS：日付→方法→時間（法則でフィルタ）→【3項目揃ったらNextが有効→POSTでセッション保存→リンク遷移】 --}}
-  <script>
-    // ========= ルール定義 =========
-    const RULES = {
-      delivery: {
-        WED_FRI:   ["12:00-14:00","16:00-17:00","18:30-19:30"],
-        THU_SAT_SUN:["10:00-11:00","12:00-14:00","16:00-17:00","18:30-19:30"]
-      },
-      store: {
-        WED_FRI:   ["14:00-16:00","17:00-18:30"],
-        THU_SAT_SUN:["11:00-12:00","14:00-16:00","17:00-18:30"]
-      }
-    };
-    const RULE_CAPACITY = {
-      delivery: (range) => range === "12:00-14:00" ? 3 : 1,
-      store:    () => 3
-    };
+<script>
+  // ========= 参照 =========
+  const calendarRoot = document.getElementById('calendarRoot');
+  const MIN_DATE = calendarRoot?.dataset?.minDate || '';
 
-    function isoWeekday(dateStr){ const d = new Date(dateStr + 'T00:00:00'); const js = d.getDay(); return js === 0 ? 7 : js; }
-    function ruleKeyByDow(dow){ if (dow===3||dow===5) return 'WED_FRI'; if (dow===4||dow===6||dow===7) return 'THU_SAT_SUN'; return null; }
-    function toHHMM(s){ return (s||'').slice(0,5); }
-    function listAllowedRanges(dateStr, method){ const key = ruleKeyByDow(isoWeekday(dateStr)); if (!key) return []; return (RULES[method]?.[key] ?? []).slice(); }
-    function formatJPDate(iso){ if(!iso) return ''; const [y,m,d]=iso.split('-').map(n=>parseInt(n,10)); return `${y}年${m}月${d}日`; }
-    function lt(a,b){ return a && b && a < b; }
+  const dateHidden = document.getElementById('selected_date');
+  const dateLabel  = document.getElementById('selected_date_label');
+  const methodSel  = document.getElementById('method');
+  const timeSel    = document.getElementById('time');
+  const ruleHelper = document.getElementById('ruleHelper');
+  const nextLink   = document.getElementById('nextLink');
 
-    const calendarRoot = document.getElementById('calendarRoot');
-    const MIN_DATE = calendarRoot?.dataset?.minDate || '';
+  // POST用 hidden
+  const metaForm   = document.getElementById('reserveMetaForm');
+  const fMethod    = document.getElementById('receive_method');
+  const fDate      = document.getElementById('receive_date');
+  const fTime      = document.getElementById('receive_time');
+  const fTimeStart = document.getElementById('receive_time_start');
+  const fTimeEnd   = document.getElementById('receive_time_end');
 
-    const dayCells   = document.querySelectorAll('.daycell');
-    const dateHidden = document.getElementById('selected_date');
-    const dateLabel  = document.getElementById('selected_date_label');
-    const methodSel  = document.getElementById('method');
-    const timeSel    = document.getElementById('time');
-    const ruleHelper = document.getElementById('ruleHelper');
-    const nextLink   = document.getElementById('nextLink');
+  // ========= ユーティリティ =========
+  function isoWeekday(dateStr){ const d = new Date(dateStr + 'T00:00:00'); const js = d.getDay(); return js === 0 ? 7 : js; }
+  function ruleKeyByDow(dow){ if (dow===3||dow===5) return 'WED_FRI'; if (dow===4||dow===6||dow===7) return 'THU_SAT_SUN'; return null; }
+  function toHHMM(s){ return (s||'').slice(0,5); }
+  function formatJPDate(iso){ if(!iso) return ''; const [y,m,d]=iso.split('-').map(n=>parseInt(n,10)); return `${y}年${m}月${d}日`; }
+  function lt(a,b){ return a && b && a < b; }
 
-    // セッション保存用（POST）フォーム
-    const metaForm   = document.getElementById('reserveMetaForm');
-    const fMethod    = document.getElementById('receive_method');
-    const fDate      = document.getElementById('receive_date');
-    const fTime      = document.getElementById('receive_time');
-    const fTimeStart = document.getElementById('receive_time_start');
-    const fTimeEnd   = document.getElementById('receive_time_end');
+  const RULES = {
+    delivery: {
+      WED_FRI:   ["12:00-14:00","16:00-17:00","18:30-19:30"],
+      THU_SAT_SUN:["10:00-11:00","12:00-14:00","16:00-17:00","18:30-19:30"]
+    },
+    store: {
+      WED_FRI:   ["14:00-16:00","17:00-18:30"],
+      THU_SAT_SUN:["11:00-12:00","14:00-16:00","17:00-18:30"]
+    }
+  };
+  const RULE_CAPACITY = {
+    delivery: (range) => range === "12:00-14:00" ? 3 : 1,
+    store:    () => 3
+  };
+  function listAllowedRanges(dateStr, method){
+    const key = ruleKeyByDow(isoWeekday(dateStr));
+    if (!key) return [];
+    return (RULES[method]?.[key] ?? []).slice();
+  }
 
-    let selectedBtn = null;
+  function readyToProceed(){
+    const d = !!dateHidden.value;
+    const m = !!methodSel.value;
+    const t = !!timeSel.value && !timeSel.selectedOptions[0]?.disabled;
+    return d && m && t;
+  }
+  function updateNextButtonState(){
+    const ok = readyToProceed();
+    nextLink.classList.toggle('pointer-events-none', !ok);
+    nextLink.classList.toggle('opacity-50', !ok);
+    nextLink.setAttribute('aria-disabled', String(!ok));
+  }
+  function resetMethodAndTime() {
+    methodSel.value = '';
+    methodSel.disabled = true;
+    timeSel.innerHTML = '<option value="" selected>先に受取り方法を選択</option>';
+    timeSel.disabled = true;
+    ruleHelper.textContent = '';
+    updateNextButtonState();
+  }
+  function enableMethod() {
+    methodSel.disabled = false;
+    timeSel.disabled = true;
+    timeSel.innerHTML = '<option value="" selected>先に受取り方法を選択</option>';
+    updateRuleHint();
+    updateNextButtonState();
+  }
+  function updateRuleHint(){
+    const d = dateHidden.value, m = methodSel.value;
+    if (!d || !m) { ruleHelper.textContent = ''; return; }
+    const key = ruleKeyByDow(isoWeekday(d));
+    const ranges = listAllowedRanges(d, m);
+    const label = m === 'delivery' ? '配達' : '店頭受取';
+    const wk = {WED_FRI:'水・金', THU_SAT_SUN:'木・土・日'}[key] || '休業日';
+    if (ranges.length) ruleHelper.innerHTML = `選択日（${wk}）の<strong>${label}</strong>受付時間：${ranges.join(' / ')}`;
+    else ruleHelper.textContent = 'この曜日は受付していません';
+  }
 
-    function resetMethodAndTime() {
-      methodSel.value = '';
-      methodSel.disabled = true;
-      timeSel.innerHTML = '<option value="" selected>先に受取り方法を選択</option>';
+  // ========= ★ カレンダー：イベント委譲 =========
+  let selectedBtn = null;
+  calendarRoot?.addEventListener('click', (e) => {
+    const btn = e.target.closest('.daycell[data-date]');
+    if (!btn || !calendarRoot.contains(btn)) return;
+
+    // 無効ボタンは弾く（disabled属性やaria-disabledで判定）
+    if (btn.hasAttribute('disabled') || btn.getAttribute('aria-disabled') === 'true') return;
+
+    const date = btn.getAttribute('data-date');
+    if (!date) return;
+
+    if (MIN_DATE && lt(date, MIN_DATE)) {
+      alert(`この日は選べません。${formatJPDate(MIN_DATE)} 以降を選択してください。`);
+      return;
+    }
+
+    // 値のセット
+    dateHidden.value = date;
+    dateLabel.value  = formatJPDate(date);
+
+    // 見た目
+    if (selectedBtn) {
+      selectedBtn.classList.remove('ring-2','ring-slate-400','ring-offset-1');
+      selectedBtn.querySelector('.selected-mark')?.classList.add('hidden');
+    }
+    selectedBtn = btn;
+    btn.classList.add('ring-2','ring-slate-400','ring-offset-1');
+    btn.querySelector('.selected-mark')?.classList.remove('hidden');
+
+    enableMethod();
+    updateNextButtonState();
+  });
+
+  // ========= 受取り方法 → 時間帯 =========
+  methodSel.addEventListener('change', async () => {
+    const d = dateHidden.value, m = methodSel.value;
+    updateRuleHint();
+    timeSel.innerHTML = '';
+    if (!d || !m) {
       timeSel.disabled = true;
-      ruleHelper.textContent = '';
+      timeSel.innerHTML = '<option value="" selected>日付/方法の選択を確認してください</option>';
       updateNextButtonState();
-    }
-    function enableMethod() {
-      methodSel.disabled = false;
-      timeSel.disabled = true;
-      timeSel.innerHTML = '<option value="" selected>先に受取り方法を選択</option>';
-      updateRuleHint();
-      updateNextButtonState();
-    }
-    function updateRuleHint(){
-      const d = dateHidden.value, m = methodSel.value;
-      if (!d || !m) { ruleHelper.textContent = ''; return; }
-      const key = ruleKeyByDow(isoWeekday(d));
-      const ranges = listAllowedRanges(d, m);
-      const label = m === 'delivery' ? '配達' : '店頭受取';
-      const wk = {WED_FRI:'水・金', THU_SAT_SUN:'木・土・日'}[key] || '休業日';
-      if (ranges.length) ruleHelper.innerHTML = `選択日（${wk}）の<strong>${label}</strong>受付時間：${ranges.join(' / ')}`;
-      else ruleHelper.textContent = 'この曜日は受付していません';
+      return;
     }
 
-    function readyToProceed(){
-      const d = !!dateHidden.value;
-      const m = !!methodSel.value;
-      const t = !!timeSel.value && !timeSel.selectedOptions[0]?.disabled;
-      return d && m && t;
-    }
-    function updateNextButtonState(){
-      const ok = readyToProceed();
-      // <a>はdisabledが無いので見た目と挙動を手動で切替
-      nextLink.classList.toggle('pointer-events-none', !ok);
-      nextLink.classList.toggle('opacity-50', !ok);
-      nextLink.setAttribute('aria-disabled', String(!ok));
-    }
+    timeSel.disabled = true;
+    timeSel.innerHTML = '<option value="" selected>読み込み中...</option>';
 
-    // カレンダー日クリック
-    dayCells.forEach(btn => {
-      btn.addEventListener('click', () => {
-        if (!btn.hasAttribute('data-date')) return;
-        const date = btn.getAttribute('data-date');
-        if (MIN_DATE && lt(date, MIN_DATE)) {
-          alert(`この日は選べません。${formatJPDate(MIN_DATE)} 以降を選択してください。`);
-          return;
-        }
-        dateHidden.value = date;
-        dateLabel.value  = formatJPDate(date);
-
-        if (selectedBtn) {
-          selectedBtn.classList.remove('ring-2','ring-slate-400','ring-offset-1');
-          selectedBtn.querySelector('.selected-mark')?.classList.add('hidden');
-        }
-        selectedBtn = btn;
-        btn.classList.add('ring-2','ring-slate-400','ring-offset-1');
-        btn.querySelector('.selected-mark')?.classList.remove('hidden');
-
-        enableMethod();
-        updateNextButtonState();
+    // サーバ枠
+    let serverSlots = [];
+    try {
+      const res = await fetch(`/slots?date=${encodeURIComponent(d)}&slot_type=${encodeURIComponent(m)}`, {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
       });
+      serverSlots = await res.json();
+    } catch (e) {
+      serverSlots = [];
+    }
+
+    const allowed = listAllowedRanges(d, m);
+    const normalized = (serverSlots || []).map(s => ({
+      start: toHHMM(s.start_time),
+      end:   toHHMM(s.end_time),
+      remaining: (typeof s.remaining === 'number') ? s.remaining : null
+    }));
+
+    const intersection = allowed.map(range => {
+      const [st, en] = range.split('-');
+      const hit = normalized.find(x => x.start === st && x.end === en) || null;
+      return { start: st, end: en, serverRemaining: hit ? hit.remaining : null };
     });
 
-    // 受取り方法変更 → 時間帯読込
-    methodSel.addEventListener('change', async () => {
-      const d = dateHidden.value, m = methodSel.value;
-      updateRuleHint();
-      timeSel.innerHTML = '';
-      if (!d || !m) {
-        timeSel.disabled = true;
-        timeSel.innerHTML = '<option value="" selected>日付/方法の選択を確認してください</option>';
-        updateNextButtonState();
-        return;
-      }
-
+    if (!intersection.length) {
       timeSel.disabled = true;
-      timeSel.innerHTML = '<option value="" selected>読み込み中...</option>';
+      timeSel.innerHTML = '<option value="" selected>選択可能な時間がありません</option>';
+      updateNextButtonState();
+      return;
+    }
 
-      // サーバの実在枠を取得
-      let serverSlots = [];
-      try {
-        const res = await fetch(`/slots?date=${encodeURIComponent(d)}&slot_type=${encodeURIComponent(m)}`, {
-          headers: { 'X-Requested-With': 'XMLHttpRequest' }
-        });
-        serverSlots = await res.json();
-      } catch (e) {
-        serverSlots = [];
+    timeSel.innerHTML = '';
+    timeSel.appendChild(new Option('選択してください','',true,true));
+
+    for (const s of intersection) {
+      const range  = `${s.start}-${s.end}`;
+      const ruleCap = RULE_CAPACITY[m](range);
+      const sr = s.serverRemaining;
+
+      let text = `${range}（残り${ruleCap}）`;
+      let disabled = false;
+
+      if (sr === 0) { text = `${range}（満席）`; disabled = true; }
+      if (sr === null){ text = `${range}（準備中）`; disabled = true; }
+
+      const opt = new Option(text, range);
+      opt.dataset.start = s.start; opt.dataset.end = s.end;
+      opt.disabled = disabled;
+      timeSel.appendChild(opt);
+    }
+
+    timeSel.disabled = false;
+    updateNextButtonState();
+  });
+
+  // ========= 時間選択 → hidden =========
+  timeSel.addEventListener('change', () => {
+    const d = dateHidden.value, m = methodSel.value, v = timeSel.value;
+    if (!d || !m || !v) { updateNextButtonState(); return; }
+    const [st,en] = v.split('-');
+    fDate.value = d;
+    fMethod.value = m;
+    fTime.value = st;
+    fTimeStart.value = st;
+    fTimeEnd.value = en;
+    updateNextButtonState();
+  });
+
+  // ========= 次へ（保存→遷移） =========
+  nextLink.addEventListener('click', async (e) => {
+    if (!readyToProceed()) { e.preventDefault(); return; }
+    e.preventDefault();
+
+    if (!fDate.value || !fMethod.value || !fTime.value) {
+      const v = timeSel.value || '';
+      if (v) {
+        const [st, en] = v.split('-');
+        fDate.value = dateHidden.value;
+        fMethod.value = methodSel.value;
+        fTime.value = st;
+        fTimeStart.value = st;
+        fTimeEnd.value = en;
       }
+    }
 
-      const allowed = listAllowedRanges(d, m);
-      const normalized = (serverSlots || []).map(s => ({
-        start: toHHMM(s.start_time),
-        end:   toHHMM(s.end_time),
-        remaining: (typeof s.remaining === 'number') ? s.remaining : null
-      }));
-
-      const intersection = allowed.map(range => {
-        const [st, en] = range.split('-');
-        const hit = normalized.find(x => x.start === st && x.end === en) || null;
-        return { start: st, end: en, serverRemaining: hit ? hit.remaining : null };
+    const token = document.querySelector('#reserveMetaForm input[name="_token"]')?.value || '';
+    try {
+      await fetch(nextLink.dataset.postAction, {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': token },
+        body: new FormData(metaForm),
+        redirect: 'follow',
       });
+    } catch (_) { return; }
 
-      if (!intersection.length) {
-        timeSel.disabled = true;
-        timeSel.innerHTML = '<option value="" selected>選択可能な時間がありません</option>';
-        updateNextButtonState();
-        return;
-      }
+    window.location.href = nextLink.href;
+  });
 
-      timeSel.innerHTML = '';
-      timeSel.appendChild(new Option('選択してください','',true,true));
+  // ========= 初期化 =========
+  (function init(){
+    methodSel.disabled = true;
+    timeSel.disabled = true;
+    updateNextButtonState();
+  })();
+</script>
 
-      for (const s of intersection) {
-        const range  = `${s.start}-${s.end}`;
-        const ruleCap = RULE_CAPACITY[m](range);
-        const sr = s.serverRemaining;
-
-        let text = `${range}（残り${ruleCap}）`;
-        let disabled = false;
-
-        if (sr === 0) { text = `${range}（満席）`; disabled = true; }
-        if (sr === null){ text = `${range}（準備中）`; disabled = true; }
-
-        const opt = new Option(text, range);
-        opt.dataset.start = s.start; opt.dataset.end = s.end;
-        opt.disabled = disabled;
-        timeSel.appendChild(opt);
-      }
-
-      timeSel.disabled = false;
-      updateNextButtonState();
-    });
-
-    // 時間選択：hiddenへ値をセット（送信はまだしない）
-    timeSel.addEventListener('change', () => {
-      const d = dateHidden.value, m = methodSel.value, v = timeSel.value;
-      if (!d || !m || !v) { updateNextButtonState(); return; }
-      const [st,en] = v.split('-');
-
-      fDate.value = d;
-      fMethod.value = m;
-      fTime.value = st;
-      fTimeStart.value = st;
-      fTimeEnd.value = en;
-
-      updateNextButtonState();
-    });
-
-    // 「次へ」クリック：3項目そろっていれば POST → href へ遷移（置き換え②）
-    nextLink.addEventListener('click', async (e) => {
-      if (!readyToProceed()) { e.preventDefault(); return; }
-      e.preventDefault();
-
-      // 念のため hidden 値を最終セット
-      if (!fDate.value || !fMethod.value || !fTime.value) {
-        const v = timeSel.value || '';
-        if (v) {
-          const [st, en] = v.split('-');
-          fDate.value = dateHidden.value;
-          fMethod.value = methodSel.value;
-          fTime.value = st;
-          fTimeStart.value = st;
-          fTimeEnd.value = en;
-        }
-      }
-
-      const token = document.querySelector('#reserveMetaForm input[name="_token"]')?.value || '';
-
-      try {
-        await fetch(nextLink.dataset.postAction, {
-          method: 'POST',
-          headers: {
-            'X-Requested-With': 'XMLHttpRequest',
-            'X-CSRF-TOKEN': token,
-          },
-          body: new FormData(metaForm),
-          redirect: 'follow',
-        });
-      } catch (_) {
-        // 保存失敗時は遷移を中断（必要に応じてトースト等）
-        return;
-      }
-
-      // productsへ遷移
-      window.location.href = nextLink.href;
-    });
-
-    // 初期化
-    (function init(){
-      methodSel.disabled = true;
-      timeSel.disabled = true;
-      updateNextButtonState();
-    })();
-  </script>
 @endsection

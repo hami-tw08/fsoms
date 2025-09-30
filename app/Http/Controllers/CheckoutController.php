@@ -134,21 +134,18 @@ class CheckoutController extends Controller
 
         $grandTotal = $total + $deliveryFee;
 
-        // ---- 既存の confirm.blade.php（前回共有分）にフィールドを合わせるための表示用整形 ----
-        // 画面側は $shipping['guest_name'], ['guest_phone'], ['delivery_postal_code'], ['delivery_address'], ['notes'] を参照
+        // confirm.blade.php に合わせた表示用整形
         $shippingForView = [
-            'guest_name'          => $shipping['orderer_name']  ?? '',
-            'guest_phone'         => $shipping['orderer_phone'] ?? '',
-            'delivery_postal_code'=> $shipping['postal_code']   ?? '',
-            'delivery_address'    => $shipping['address']       ?? '',
-            'notes'               => $shipping['notes']         ?? '',
+            'guest_name'           => $shipping['orderer_name']  ?? '',
+            'guest_phone'          => $shipping['orderer_phone'] ?? '',
+            'delivery_postal_code' => $shipping['postal_code']   ?? '',
+            'delivery_address'     => $shipping['address']       ?? '',
+            'notes'                => $shipping['notes']         ?? '',
         ];
-        // -------------------------------------------------------------------
 
         $date = $meta['date'] ?? null;
         $time = $meta['time'] ?? null;
 
-        // ここで view に渡す $shipping は「表示用整形後」の配列に差し替える
         return view('checkout.confirm', [
             'cart'         => $cart,
             'meta'         => $meta,
@@ -164,28 +161,43 @@ class CheckoutController extends Controller
     }
 
     /**
-     * 注文確定（安全版：DB未保存 → 完了画面へ）
+     * 注文確定（DB未保存 → 完了画面へ）
+     * - 同意チェックを廃止
+     * - 完了画面表示用の最小データを reservation.completed に保存してから、元セッションを掃除
      */
     public function place(Request $request): RedirectResponse
     {
-        $request->validate([
-            'agree' => ['accepted'],
-        ], [
-            'agree.accepted' => '利用規約への同意が必要です。',
-        ]);
-
         $cart = (array) session('reservation.cart', []);
         if (empty($cart)) {
             return redirect()->route('cart.index')->with('cart_error', 'カートが空です。');
         }
 
-        // --- 実装ポイント（後で差し替え） ----------------------------------
-        // Reservation::create([...]);
-        // ReservationItem::insert([...]);
-        // 決済がある場合はここでハンドリング
-        // -------------------------------------------------------------------
+        $meta     = (array) session('reservation.meta', []);
+        $shipping = (array) session('reservation.shipping', []);
 
-        // セッション掃除
+        // 合計計算
+        $total = 0;
+        foreach ($cart as $row) {
+            $total += (int) ($row['price'] ?? 0) * (int) ($row['qty'] ?? 0);
+        }
+
+        // 配送料計算（confirm と同等）
+        $isDelivery   = ($meta['method'] ?? null) === 'delivery';
+        $deliveryArea = $shipping['area'] ?? null;
+        $deliveryFee  = $isDelivery ? (self::DELIVERY_FEES[$deliveryArea] ?? 900) : 0;
+        $grandTotal   = $total + $deliveryFee;
+
+        // 完了画面用に必要最小限を一時保存
+        session()->put('reservation.completed', [
+            'cart'         => $cart,
+            'meta'         => $meta,
+            'deliveryArea' => $deliveryArea,
+            'total'        => $total,
+            'deliveryFee'  => $deliveryFee,
+            'grandTotal'   => $grandTotal,
+        ]);
+
+        // 元データは掃除（完了表示用は残す）
         session()->forget('reservation.cart');
         session()->forget('reservation.meta');
         session()->forget('reservation.shipping');
@@ -195,9 +207,17 @@ class CheckoutController extends Controller
 
     /**
      * 完了画面
+     * - reservation.completed の内容をビューに渡す
      */
     public function complete(): View
     {
-        return view('checkout.complete');
+        return view('checkout.complete', [
+            'cart'         => session('reservation.completed.cart'),
+            'meta'         => session('reservation.completed.meta'),
+            'deliveryArea' => session('reservation.completed.deliveryArea'),
+            'total'        => session('reservation.completed.total'),
+            'deliveryFee'  => session('reservation.completed.deliveryFee'),
+            'grandTotal'   => session('reservation.completed.grandTotal'),
+        ]);
     }
 }

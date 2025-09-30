@@ -16,6 +16,20 @@
 <div class="container mx-auto p-4">
   <h1 class="text-2xl font-bold mb-4">{{ $pageTitle }}</h1>
 
+  {{-- ▼ ステッパー（現在=3：予約者情報等の入力） --}}
+  @php
+    $__steps = ['予約日時・受取り方法','商品の選択','予約者情報の入力','入力情報の確認','予約完了'];
+  @endphp
+  <div class="overflow-x-auto mb-4" data-theme="namieflower">
+    <x-stepper
+      :steps="$__steps"
+      :current="3"
+      :verticalOnSm="false"
+      :showLabels="true"
+      class="justify-center w-full mx-auto max-w-4xl gap-3 min-w-max" />
+  </div>
+  {{-- ▲ ステッパーここまで --}}
+
   <div class="mb-4 text-sm text-gray-600">
     <div>受取方法：<span class="font-semibold">{{ $isDelivery ? '配送' : '店頭受取' }}</span></div>
     @if(($meta['date'] ?? false) && ($meta['time'] ?? false))

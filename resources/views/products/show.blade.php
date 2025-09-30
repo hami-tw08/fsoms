@@ -12,28 +12,21 @@
     </ul>
   </div>
 
-  {{-- 受取情報の表示（セッションから） --}}
-  @php $meta = session('reservation.meta', []); @endphp
-  @if(!empty($meta))
-    <div class="alert alert-info mb-4">
-      <div>
-        <span class="font-semibold">受取方法：</span>{{ ($meta['method'] ?? '') === 'delivery' ? '配送' : '店頭受取' }}
-        @if(($meta['date'] ?? false) && ($meta['time'] ?? false))
-          <span class="ml-4"><span class="font-semibold">受取日時：</span>{{ $meta['date'] }} {{ $meta['time'] }}</span>
-        @endif
-      </div>
-    </div>
-  @endif
+  {{-- ▼ ステッパー（現在=2：商品の選択） --}}
+  @php
+    $__steps = ['予約日時・受取り方法','商品の選択','予約者情報の入力','入力情報の確認','予約完了'];
+  @endphp
+  <div class="overflow-x-auto mb-6" data-theme="namieflower">
+    <x-stepper
+      :steps="$__steps"
+      :current="2"
+      :verticalOnSm="false"
+      :showLabels="true"
+      class="justify-center w-full mx-auto max-w-4xl gap-3 min-w-max" />
+  </div>
+  {{-- ▲ ステッパーここまで --}}
 
-  @if ($errors->any())
-    <div class="alert alert-error mb-4">
-      <ul class="list-disc list-inside">
-        @foreach ($errors->all() as $error)
-          <li>{{ $error }}</li>
-        @endforeach
-      </ul>
-    </div>
-  @endif
+
 
   <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
     {{-- 画像 --}}

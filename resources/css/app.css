@@ -1,3 +1,23 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+  /* 丸＆横バーの色を画像のHEXで固定 */
+  [data-theme="namieflower"] .steps .step-primary::before,
+  [data-theme="namieflower"] .steps .step-primary + .step::after {
+    background-color: #679ace !important;
+    border-color: #679ace !important;
+  }
+  [data-theme="namieflower"] .steps .step-secondary::before,
+  [data-theme="namieflower"] .steps .step-secondary + .step::after {
+    background-color: #d493b5 !important;
+    border-color: #d493b5 !important;
+  }
+
+  /* ラベル（下の文字）は黒系で統一：完了/現在でも白にしない */
+  [data-theme="namieflower"] .steps .step .step-content,
+  [data-theme="namieflower"] .steps .step > span,
+  [data-theme="namieflower"] .steps .step {
+    color: var(--bc, #1f2937) !important; /* base-content 相当 */
+  }
+
