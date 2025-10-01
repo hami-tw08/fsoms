@@ -10,8 +10,8 @@ use App\Http\Controllers\CheckoutController;
 
 // --- Admin Controllers ---
 use App\Http\Controllers\Admin\DashboardController;
-use App\Http\Controllers\Admin\AdminReservationController;
 use App\Http\Controllers\Admin\ProductController as AdminProductController;
+use App\Http\Controllers\Admin\ReservationController as AdminReservationController;
 
 /*
 |--------------------------------------------------------------------------
@@ -70,19 +70,23 @@ Route::get('/dashboard', fn () => view('dashboard'))->middleware(['auth', 'verif
 
 /** Admin */
 Route::middleware(['auth', 'is_admin'])
-    ->prefix('admin')
-    ->name('admin.')
+    ->prefix('admin')->name('admin.')
     ->group(function () {
-        Route::get('/', DashboardController::class)->name('dashboard');
-        Route::get('/reservations', [AdminReservationController::class, 'index'])->name('reservations.index');
 
+        // ダッシュボード（既存のコントローラを採用）
+        Route::get('/', DashboardController::class)->name('dashboard');
+
+        // 予約一覧（今回追加）
+        Route::get('/reservations', [AdminReservationController::class, 'index'])->name('reservations.index');
+        Route::get('/reservations/export', [AdminReservationController::class, 'export'])->name('reservations.export');
+        Route::get('/reservations/{reservation}', [AdminReservationController::class, 'show'])->name('reservations.show');
+
+        // スロット管理（既存）
         Route::get('/slots', [\App\Http\Controllers\SlotController::class, 'index'])->name('slots.index');
         Route::post('/slots/{id}/toggle', [\App\Http\Controllers\SlotController::class, 'toggle'])->name('slots.toggle');
-    });
 
-    Route::prefix('admin')->name('admin.')->group(function () {
-    Route::get('/', fn() => redirect()->route('admin.products.index'))->name('dashboard');
-    Route::resource('products', AdminProductController::class)->except(['show']);
+        // 商品管理（既存）
+        Route::resource('products', AdminProductController::class)->except(['show']);
     });
 
 require __DIR__ . '/auth.php';
