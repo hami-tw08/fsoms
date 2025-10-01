@@ -38,67 +38,69 @@
   <table class="table table-zebra">
     <thead>
       <tr>
-        <th class="whitespace-nowrap">ID</th>
-        <th class="whitespace-nowrap">日時</th>
-        <th class="whitespace-nowrap">枠ID</th>
-        <th class="whitespace-nowrap">氏名</th>
-        <th class="whitespace-nowrap">電話</th>
-        <th class="whitespace-nowrap">商品</th>
-        <th class="whitespace-nowrap">受取/配達</th>
-        <th class="whitespace-nowrap">エリア</th>
-        <th class="whitespace-nowrap">作成</th>
-        <th></th>
+        <th class="whitespace-nowrap">予約日</th>
+        <th class="whitespace-nowrap">時間</th>
+        <th class="whitespace-nowrap">受取</th>
+        <th class="whitespace-nowrap">予約者氏名</th>
+        <th class="whitespace-nowrap">選択商品</th>
+        <th class="whitespace-nowrap text-right">合計金額</th>
       </tr>
     </thead>
     <tbody>
     @forelse ($reservations as $r)
+      @php
+        // 予約日時はスロットのstart_atを優先
+        $start = $r->slot?->start_at?->timezone(config('app.timezone'));
+        $date  = $start?->format('Y-m-d') ?? '—';
+        $time  = $start?->format('H:i') ?? '—';
+
+        // 受取方法
+        $methodLabel = match($r->method ?? null) {
+          'store' => '店頭',
+          'delivery' => '配達',
+          default => '—',
+        };
+
+        // 合計金額（存在する情報でフォールバック）
+        $amount = $r->total_amount
+          ?? ((isset($r->unit_price, $r->quantity)) ? ((int)$r->unit_price * (int)$r->quantity) : null)
+          ?? ($r->product->price ?? null);
+      @endphp
       <tr>
-        <td>{{ $r->id }}</td>
-        <td class="whitespace-nowrap">
-          @if($r->slot)
-            <div>{{ $r->slot->start_at?->format('Y-m-d H:i') }}〜</div>
-          @else
-            <span class="text-gray-400">未割当</span>
-          @endif
-        </td>
-        <td>{{ $r->slot_id ?? '-' }}</td>
-        <td>{{ $r->guest_name ?? '-' }}</td>
-        <td><a href="tel:{{ $r->guest_phone }}">{{ $r->guest_phone ?? '-' }}</a></td>
-        <td>
-          @if($r->product)
-            <div class="flex items-center gap-2">
-              <span class="font-medium">#{{ $r->product_id }}</span>
-              <span class="badge">{{ \Illuminate\Support\Str::limit($r->product->name, 16) }}</span>
-            </div>
-          @else
-            {{ $r->product_id ?? '-' }}
-          @endif
-        </td>
+        <td>{{ $date }}</td>
+        <td>{{ $time }}</td>
         <td>
           @if(($r->method ?? null) === 'store')
             <span class="badge badge-primary">店頭</span>
           @elseif(($r->method ?? null) === 'delivery')
             <span class="badge badge-secondary">配達</span>
           @else
-            <span class="badge">-</span>
+            <span class="badge">—</span>
           @endif
         </td>
-        <td>{{ $r->delivery_area ?? '-' }}</td>
-        <td class="whitespace-nowrap">{{ $r->created_at?->format('Y-m-d H:i') }}</td>
-        <td class="text-right">
-          <div class="flex justify-end gap-2">
-            <a class="btn btn-xs" href="{{ route('admin.reservations.show', $r) }}">詳細</a>
-            {{-- 必要なら編集機能 --}}
-            {{-- <a class="btn btn-xs btn-outline" href="{{ route('admin.reservations.edit', $r) }}">編集</a> --}}
-          </div>
+        <td>{{ $r->guest_name ?? $r->customer_name ?? '—' }}</td>
+        <td>
+          @if($r->product)
+            <div class="flex items-center gap-2">
+              <span class="badge">{{ \Illuminate\Support\Str::limit($r->product->name, 20) }}</span>
+            </div>
+          @else
+            （商品未設定）
+          @endif
+        </td>
+        <td class="text-right font-semibold">
+          {{ isset($amount) ? number_format($amount) . '円' : '—' }}
         </td>
       </tr>
     @empty
-      <tr><td colspan="10" class="text-center text-gray-500">該当する予約はありません</td></tr>
+      <tr>
+        <td colspan="6" class="text-center text-gray-500">該当する予約はありません</td>
+      </tr>
     @endforelse
     </tbody>
   </table>
 </div>
+
 
 <div class="mt-4">
   {{ $reservations->appends(request()->query())->links() }}

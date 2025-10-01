@@ -102,36 +102,54 @@ class ReservationController extends Controller
     /**
      * 本予約の登録（最終POST）
      */
-    public function store(StoreReservationRequest $request)
-    {
-        $slot = ReservationSlot::findOrFail($request->slot_id);
+// app/Http/Controllers/ReservationController.php
 
-        // サーバ側 3日前ガード
-        $minDate = Carbon::today()->addDays(3)->toDateString();
-        if (Carbon::parse($slot->slot_date)->lt($minDate)) {
+public function store(StoreReservationRequest $request)
+{
+    $slot = ReservationSlot::findOrFail($request->slot_id);
+
+    // 3日前ガード
+    $minDate = Carbon::today()->addDays(3)->toDateString();
+    if (Carbon::parse($slot->slot_date)->lt($minDate)) {
+        return back()
+            ->withErrors([
+                'slot_id' => '予約日は ' . Carbon::parse($minDate)->isoFormat('M月D日(ddd)') . ' 以降を選んでください。',
+            ])->withInput();
+    }
+
+    $product = Product::findOrFail($request->product_id);
+    $total   = $product->price * (int)$request->quantity;
+
+    return DB::transaction(function () use ($request, $slot, $product, $total) {
+        // 対象スロットをロック
+        $slotLocked = DB::table('reservation_slots')->where('id', $slot->id)->lockForUpdate()->first();
+
+        // 現予約数を再計算（booked/completed）
+        $bookedCount = DB::table('reservations')
+            ->where('slot_id', $slot->id)
+            ->whereIn('status', ['booked', 'completed'])
+            ->lockForUpdate() // 参照側もロックしておくとより堅牢
+            ->count();
+
+        if ($bookedCount >= (int)$slotLocked->capacity) {
+            // 満席：ロールバックしてエラー返却
             return back()
-                ->withErrors([
-                    'slot_id' => '予約日は ' . Carbon::parse($minDate)->isoFormat('M月D日(ddd)') . ' 以降を選んでください。',
-                ])
+                ->withErrors(['slot_id' => '申し訳ありません。この枠は満席になりました。別の時間をお選びください。'])
                 ->withInput();
         }
 
-        $product = Product::findOrFail($request->product_id);
-        $total = $product->price * (int)$request->quantity;
-
+        // ここまで来たら空きあり → 予約作成
         Reservation::create([
             'slot_id'      => $slot->id,
-            'user_id'      => optional($request->user())->id, // ゲストなら null
+            'user_id'      => optional($request->user())->id,
             'product_id'   => $product->id,
             'quantity'     => (int)$request->quantity,
             'total_amount' => $total,
             'status'       => 'booked',
             'notes'        => $request->notes,
-            // 配達向け
             'delivery_area'        => $request->delivery_area,
             'delivery_postal_code' => $request->delivery_postal_code,
             'delivery_address'     => $request->delivery_address,
-            // ゲスト予約
             'guest_name'  => $request->guest_name,
             'guest_phone' => $request->guest_phone,
         ]);
@@ -139,7 +157,9 @@ class ReservationController extends Controller
         return redirect()
             ->route('reserve.create', ['month' => $request->query('month')])
             ->with('status', '予約を作成しました！');
-    }
+    });
+}
+
 
     /**
      * カレンダー右側の“中間保存”POST（受取り方法・日付・時間）→ セッション保存

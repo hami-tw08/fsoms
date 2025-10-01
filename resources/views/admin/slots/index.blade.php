@@ -1,58 +1,76 @@
-@extends('layouts.admin')
-@section('title','予約枠')
+{{-- resources/views/admin/slots/index.blade.php --}}
+@extends('layouts.daisy')
+@section('title','スロット管理')
 @section('content')
-<div class="flex items-center justify-between mb-4">
-  <div class="join">
-    <a class="btn join-item {{ request('type')===null?'btn-active':'' }}" href="{{ route('admin.slots.index') }}">すべて</a>
-    <a class="btn join-item {{ request('type')==='store'?'btn-active':'' }}" href="{{ route('admin.slots.index',['type'=>'store']) }}">店</a>
-    <a class="btn join-item {{ request('type')==='delivery'?'btn-active':'' }}" href="{{ route('admin.slots.index',['type'=>'delivery']) }}">配</a>
-  </div>
-  <form method="GET" class="join">
-    <input class="input input-bordered join-item" type="date" name="date" value="{{ request('date') }}">
-    @foreach (['type'] as $keep) @if(request($keep)) <input type="hidden" name="{{ $keep }}" value="{{ request($keep) }}"> @endif @endforeach
-    <button class="btn btn-primary join-item">絞り込み</button>
+<div class="max-w-5xl mx-auto space-y-4">
+  <h1 class="text-xl font-bold">スロット管理（通知閾値／収容数）</h1>
+
+  <form method="GET" class="flex gap-2 items-end">
+    <div>
+      <label class="label"><span class="label-text">対象日</span></label>
+      <input type="date" name="date" value="{{ $date }}" class="input input-bordered" />
+    </div>
+    <button class="btn btn-primary">表示</button>
+  </form>
+
+  @if (session('status')) <div class="alert alert-success">{{ session('status') }}</div> @endif
+
+  <form method="POST" action="{{ route('admin.slots.bulk-update') }}" class="space-y-6">
+    @csrf
+    <input type="hidden" name="date" value="{{ $date }}">
+
+    @foreach(['store'=>'店頭','delivery'=>'配送'] as $type => $label)
+      <div class="card bg-base-100 shadow">
+        <div class="card-body">
+          <h2 class="card-title">{{ $label }}（{{ $type }}）</h2>
+          <div class="overflow-x-auto">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>時間</th>
+                  <th>残数</th>
+                  <th>収容数</th>
+                  <th>通知閾値</th>
+                  <th>通知状態</th>
+                </tr>
+              </thead>
+              <tbody>
+              @foreach(($slots[$type] ?? collect()) as $s)
+                <tr>
+                  <td>{{ \Illuminate\Support\Str::of($s->start_time)->limit(5,'') }}-{{ \Illuminate\Support\Str::of($s->end_time)->limit(5,'') }}</td>
+                  <td>{{ $s->remaining }}</td>
+                  <td>
+                    <input type="number" min="0" max="99" name="items[{{ $s->id }}][capacity]"
+                           value="{{ $s->capacity }}" class="input input-bordered w-24" />
+                    <input type="hidden" name="items[{{ $s->id }}][id]" value="{{ $s->id }}">
+                  </td>
+                  <td>
+                    <input type="number" min="0" max="99" name="items[{{ $s->id }}][notify_threshold]"
+                           value="{{ $s->notify_threshold }}" class="input input-bordered w-24" />
+                  </td>
+                  <td>
+                    @if($s->notified_low_at)
+                      <span class="badge badge-warning">通知済 {{ $s->notified_low_at->format('m/d H:i') }}</span>
+                    @else
+                      <span class="badge">未通知</span>
+                    @endif
+                  </td>
+                </tr>
+              @endforeach
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    @endforeach
+
+    <div class="flex items-center gap-3">
+      <label class="label cursor-pointer">
+        <span class="label-text mr-2">通知状態をリセット</span>
+        <input type="checkbox" name="reset_notified" value="1" class="checkbox">
+      </label>
+      <button class="btn btn-primary">一括更新</button>
+    </div>
   </form>
 </div>
-
-<div class="overflow-x-auto">
-  <table class="table">
-    <thead>
-      <tr>
-        <th>ID</th>
-        <th>日付</th>
-        <th>時間</th>
-        <th>種別</th>
-        <th>定員</th>
-        <th>有効</th>
-        <th></th>
-      </tr>
-    </thead>
-    <tbody>
-    @foreach ($slots as $s)
-      <tr>
-        <td>{{ $s->id }}</td>
-        <td>{{ $s->slot_date }}</td>
-        <td>{{ \Illuminate\Support\Str::of($s->start_time)->limit(5, '') }} - {{ \Illuminate\Support\Str::of($s->end_time)->limit(5, '') }}</td>
-        <td><span class="badge">{{ $s->slot_type }}</span></td>
-        <td>{{ $s->capacity }}</td>
-        <td>
-          @if ($s->is_active)
-            <span class="badge badge-success">ON</span>
-          @else
-            <span class="badge">OFF</span>
-          @endif
-        </td>
-        <td>
-          <form method="POST" action="{{ route('admin.slots.toggle', $s->id) }}">
-            @csrf
-            <button class="btn btn-sm">{{ $s->is_active ? '無効化' : '有効化' }}</button>
-          </form>
-        </td>
-      </tr>
-    @endforeach
-    </tbody>
-  </table>
-</div>
-
-<div class="mt-4">{{ $slots->links() }}</div>
 @endsection

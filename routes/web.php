@@ -12,6 +12,9 @@ use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\ProductController as AdminProductController;
 use App\Http\Controllers\Admin\ReservationController as AdminReservationController;
+use App\Http\Controllers\Admin\SlotController as AdminSlotController; // ★ 追加
+
+use App\Http\Middleware\IsAdmin; // ★ 追加（エイリアス is_admin を使う想定）
 
 /*
 |--------------------------------------------------------------------------
@@ -73,19 +76,19 @@ Route::middleware(['auth', 'is_admin'])
     ->prefix('admin')->name('admin.')
     ->group(function () {
 
-        // ダッシュボード（既存のコントローラを採用）
+        // ダッシュボード
         Route::get('/', DashboardController::class)->name('dashboard');
 
-        // 予約一覧（今回追加）
+        // 予約一覧
         Route::get('/reservations', [AdminReservationController::class, 'index'])->name('reservations.index');
         Route::get('/reservations/export', [AdminReservationController::class, 'export'])->name('reservations.export');
         Route::get('/reservations/{reservation}', [AdminReservationController::class, 'show'])->name('reservations.show');
 
-        // スロット管理（既存）
-        Route::get('/slots', [\App\Http\Controllers\SlotController::class, 'index'])->name('slots.index');
-        Route::post('/slots/{id}/toggle', [\App\Http\Controllers\SlotController::class, 'toggle'])->name('slots.toggle');
+        // ▼ スロット管理（新UI：通知閾値／収容数の一括更新）
+        Route::get('/slots', [AdminSlotController::class, 'index'])->name('slots.index');             // 一覧＆編集フォーム
+        Route::post('/slots/bulk-update', [AdminSlotController::class, 'bulkUpdate'])->name('slots.bulk-update'); // 一括更新
 
-        // 商品管理（既存）
+        // 商品管理
         Route::resource('products', AdminProductController::class)->except(['show']);
     });
 

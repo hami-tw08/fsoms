@@ -1,0 +1,18 @@
+[90m= [39m[
+    [
+      "[34mid[39m" => [35m1[39m,
+      "[34mname[39m" => "[32mTest User[39m",
+      "[34memail[39m" => "[32mtest@example.com[39m",
+    ],
+    [
+      "[34mid[39m" => [35m2[39m,
+      "[34mname[39m" => "[32mAdmin[39m",
+      "[34memail[39m" => "[32madmin@example.com[39m",
+    ],
+    [
+      "[34mid[39m" => [35m3[39m,
+      "[34mname[39m" => "[32mHAMADA[39m",
+      "[34memail[39m" => "[32m3.kiyohashi@gmail.com[39m",
+    ],
+  ]
+
