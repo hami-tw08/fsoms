@@ -36,6 +36,7 @@ class ReservationSlot extends Model
         'capacity'   => 'integer',
         'is_active'  => 'boolean',
         'shop_id'    => 'integer',
+        'notified_low_at' => 'datetime', // ★ 追加（Bladeで ->format() したい）
     ];
 
     public function reservations()

@@ -3,7 +3,7 @@
 @section('title','スロット管理')
 @section('content')
 <div class="max-w-5xl mx-auto space-y-4">
-  <h1 class="text-xl font-bold">スロット管理（通知閾値／収容数）</h1>
+  <h1 class="text-xl font-bold">スロット管理（枠数）</h1>
 
   <form method="GET" class="flex gap-2 items-end">
     <div>
@@ -29,9 +29,7 @@
                 <tr>
                   <th>時間</th>
                   <th>残数</th>
-                  <th>収容数</th>
-                  <th>通知閾値</th>
-                  <th>通知状態</th>
+                  <th>枠数</th> {{-- 収容数 → 枠数 --}}
                 </tr>
               </thead>
               <tbody>
@@ -44,17 +42,6 @@
                            value="{{ $s->capacity }}" class="input input-bordered w-24" />
                     <input type="hidden" name="items[{{ $s->id }}][id]" value="{{ $s->id }}">
                   </td>
-                  <td>
-                    <input type="number" min="0" max="99" name="items[{{ $s->id }}][notify_threshold]"
-                           value="{{ $s->notify_threshold }}" class="input input-bordered w-24" />
-                  </td>
-                  <td>
-                    @if($s->notified_low_at)
-                      <span class="badge badge-warning">通知済 {{ $s->notified_low_at->format('m/d H:i') }}</span>
-                    @else
-                      <span class="badge">未通知</span>
-                    @endif
-                  </td>
                 </tr>
               @endforeach
               </tbody>
@@ -65,10 +52,6 @@
     @endforeach
 
     <div class="flex items-center gap-3">
-      <label class="label cursor-pointer">
-        <span class="label-text mr-2">通知状態をリセット</span>
-        <input type="checkbox" name="reset_notified" value="1" class="checkbox">
-      </label>
       <button class="btn btn-primary">一括更新</button>
     </div>
   </form>

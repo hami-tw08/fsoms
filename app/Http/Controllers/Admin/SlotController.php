@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Carbon\Carbon;
+use App\Models\ReservationSlot; // ★ 追加（bulkでEloquent使用）
 
 class SlotController extends Controller
 {
@@ -32,7 +33,6 @@ class SlotController extends Controller
 
             $slots = $q->orderBy('slot_date')->orderBy('start_time')->paginate(100)->withQueryString();
 
-            // 既存ビューとの互換性維持
             return view('admin.slots.index', [
                 'mode'  => 'list',
                 'slots' => $slots,
@@ -42,40 +42,35 @@ class SlotController extends Controller
         // ====== 新: 一括編集（通知閾値／収容数） ======
         $date = $request->input('date', Carbon::today()->toDateString());
 
-        // 当日1日の有効な枠を抽出して type ごとにまとめる
-        $rows = DB::table('reservation_slots as s')
-            ->whereDate('s.slot_date', $date)
-            ->orderBy('s.start_time')
-            ->orderBy('s.slot_type')
-            ->get([
-                's.id',
-                's.slot_date',
-                's.slot_type',     // 'store' | 'delivery'
-                's.start_time',
-                's.end_time',
-                's.capacity',
-                // ない可能性もあるので存在しなくても致命傷にならないように
-                DB::raw('COALESCE(s.notify_threshold, 1) as notify_threshold'),
-                DB::raw('s.is_active'),
-                DB::raw('s.updated_at'),
-                DB::raw('s.created_at'),
-                DB::raw('s.notified_low_at'), // ない環境も想定
-            ]);
+        // Eloquent + withCount で booked/completed 件数を集計 → remaining を計算
+        $slots = ReservationSlot::query()
+            ->whereDate('slot_date', $date)
+            ->orderBy('start_time')
+            ->orderBy('slot_type')
+            ->withCount(['reservations as booked_count' => function ($q) {
+                $q->whereIn('status', ['booked', 'completed']);
+            }])
+            ->get();
 
-        // type => rows[] にグルーピング
+        // 動的プロパティとして remaining を付与、notify_threshold のデフォルトも設定
+        $slots->each(function ($s) {
+            $booked = (int) ($s->booked_count ?? 0);
+            $s->remaining = max(0, ((int) $s->capacity) - $booked);
+            if ($s->notify_threshold === null) {
+                $s->notify_threshold = 1; // カラム未設定やNULLでも安全
+            }
+        });
+
+        // Blade 側の想定に合わせて type ごとにグループ化
         $grouped = [
-            'store'    => [],
-            'delivery' => [],
+            'store'    => $slots->where('slot_type', 'store')->values(),
+            'delivery' => $slots->where('slot_type', 'delivery')->values(),
         ];
-        foreach ($rows as $r) {
-            $grouped[$r->slot_type][] = $r;
-        }
 
-        // 一括編集用ビュー（同じ index.blade.php でもOK。blade側で mode を見て出し分け）
         return view('admin.slots.index', [
             'mode'  => 'bulk',
             'date'  => $date,
-            'slots' => $grouped, // ['store'=>[], 'delivery'=>[]]
+            'slots' => $grouped,
         ]);
     }
 
@@ -96,15 +91,6 @@ class SlotController extends Controller
 
     /**
      * 一括更新：capacity / notify_threshold / 通知状態リセット
-     * POST /admin/slots/bulk-update
-     *
-     * リクエスト例:
-     *  - date=2025-10-05
-     *  - reset_notified=1 (任意)
-     *  - items[123][id]=123
-     *  - items[123][capacity]=3
-     *  - items[123][notify_threshold]=1
-     *  - items[456][id]=456 ...
      */
     public function bulkUpdate(Request $request): RedirectResponse
     {
@@ -119,7 +105,6 @@ class SlotController extends Controller
 
         DB::transaction(function () use ($data, $request) {
             foreach ($data['items'] as $row) {
-                // 行ロックして競合更新を避ける
                 $slot = DB::table('reservation_slots')
                     ->where('id', $row['id'])
                     ->lockForUpdate()
@@ -134,19 +119,14 @@ class SlotController extends Controller
                 }
 
                 if (array_key_exists('notify_threshold', $row)) {
-                    // カラムが無い環境でもエラーにならないように存在チェック（MySQL: INFORMATION_SCHEMA 叩くのは重いので try-catch でも可）
-                    // ここは素直にセット。無い場合はマイグレーションで追加してください。
                     $updates['notify_threshold'] = (int) $row['notify_threshold'];
                 }
 
                 if ($request->boolean('reset_notified')) {
-                    // カラムが無い場合は無視されるだけ（エラーが出る場合はマイグレーション追加を）
                     $updates['notified_low_at'] = null;
                 }
 
-                DB::table('reservation_slots')
-                    ->where('id', $row['id'])
-                    ->update($updates);
+                DB::table('reservation_slots')->where('id', $row['id'])->update($updates);
             }
         });
 
