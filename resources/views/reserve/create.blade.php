@@ -25,14 +25,14 @@
 {{-- 画像：スマホは全体表示、md+ はヒーロー演出 --}}
 <div class="rounded-2xl overflow-hidden">
   {{-- sm（〜md-1）：横幅フィット＆全体表示 --}}
-  <img src="{{ asset('img/top-image2.png') }}" alt="トップイメージ"
+  <img src="{{ asset('img/top-image3.png') }}" alt="トップイメージ"
        class="block md:hidden w-full h-auto object-contain rounded-2xl">
 </div>
 
 
       {{-- md+：固定高＋cover＋オーバーレイ --}}
       <div class="hidden md:block relative h-80 lg:h-96">
-        <img src="{{ asset('img/top-image2.png') }}" alt="トップイメージ"
+        <img src="{{ asset('img/top-image3.png') }}" alt="トップイメージ"
              class="absolute inset-0 w-full h-full object-cover">
         <div class="absolute left-6 bottom-6">
           <div class="bg-base-100/90 backdrop-blur shadow-xl rounded-box px-6 py-4 max-w=[52rem] max-w-[52rem]">

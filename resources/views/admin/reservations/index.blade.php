@@ -3,6 +3,7 @@
 
 @section('content')
 <div class="flex items-center justify-between mb-4 gap-2">
+  {{-- ▼▼▼ 検索・CSV はUIを非表示（コードは残す） ▼▼▼
   <form method="GET" class="w-full">
     <div class="flex flex-wrap items-center gap-2">
       <input class="input input-bordered grow" type="text" name="q"
@@ -32,18 +33,41 @@
       </a>
     </div>
   </form>
+  ▲▲▲ 非表示ここまで ▲▲▲ --}}
+</div>
+
+{{-- 一括操作ボタン --}}
+<div class="flex items-center gap-2 mb-3">
+  <form id="bulk-delete-form" action="{{ route('admin.reservations.destroySelected') }}" method="POST" class="flex items-center gap-2">
+    @csrf
+    @method('DELETE')
+    <input type="hidden" name="ids" id="bulk-ids">
+    <button type="submit" class="btn btn-error" onclick="return confirm('選択した予約を削除します。よろしいですか？');">
+      選択削除
+    </button>
+  </form>
+
+  <form action="{{ route('admin.reservations.destroyAll') }}" method="POST" onsubmit="return confirmDeleteAll();" class="inline">
+    @csrf
+    @method('DELETE')
+    <button class="btn btn-outline btn-error">全件削除</button>
+  </form>
 </div>
 
 <div class="overflow-x-auto">
   <table class="table table-zebra">
     <thead>
       <tr>
+        <th class="w-10">
+          <input type="checkbox" class="checkbox" id="select-all">
+        </th>
         <th class="whitespace-nowrap">予約日</th>
         <th class="whitespace-nowrap">時間</th>
         <th class="whitespace-nowrap">受取</th>
         <th class="whitespace-nowrap">予約者氏名</th>
         <th class="whitespace-nowrap">選択商品</th>
         <th class="whitespace-nowrap text-right">合計金額</th>
+        <th class="whitespace-nowrap text-right">操作</th>
       </tr>
     </thead>
     <tbody>
@@ -67,6 +91,9 @@
           ?? ($r->product->price ?? null);
       @endphp
       <tr>
+        <td>
+          <input type="checkbox" class="checkbox row-check" value="{{ $r->id }}">
+        </td>
         <td>{{ $date }}</td>
         <td>{{ $time }}</td>
         <td>
@@ -91,18 +118,51 @@
         <td class="text-right font-semibold">
           {{ isset($amount) ? number_format($amount) . '円' : '—' }}
         </td>
+        <td class="text-right">
+          <form action="{{ route('admin.reservations.destroy', $r) }}" method="POST" onsubmit="return confirm('この予約を削除します。よろしいですか？');" class="inline">
+            @csrf
+            @method('DELETE')
+            <button class="btn btn-sm btn-error">削除</button>
+          </form>
+        </td>
       </tr>
     @empty
       <tr>
-        <td colspan="6" class="text-center text-gray-500">該当する予約はありません</td>
+        <td colspan="8" class="text-center text-gray-500">該当する予約はありません</td>
       </tr>
     @endforelse
     </tbody>
   </table>
 </div>
 
-
 <div class="mt-4">
   {{ $reservations->appends(request()->query())->links() }}
 </div>
+
+{{-- JS（最小限） --}}
+<script>
+  const selectAll = document.getElementById('select-all');
+  const checks = () => Array.from(document.querySelectorAll('.row-check'));
+  const bulkIds = document.getElementById('bulk-ids');
+  const bulkForm = document.getElementById('bulk-delete-form');
+
+  selectAll?.addEventListener('change', e => {
+    checks().forEach(cb => cb.checked = e.target.checked);
+    setBulkIds();
+  });
+
+  document.addEventListener('change', e => {
+    if (e.target.classList?.contains('row-check')) setBulkIds();
+  });
+
+  function setBulkIds() {
+    const ids = checks().filter(cb => cb.checked).map(cb => cb.value);
+    bulkIds.value = ids.join(',');
+  }
+
+  function confirmDeleteAll() {
+    if (!confirm('【危険】予約を全件削除します。よろしいですか？')) return false;
+    return confirm('本当に全件削除しますか？この操作は取り消せません。');
+  }
+</script>
 @endsection

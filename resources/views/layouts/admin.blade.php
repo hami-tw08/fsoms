@@ -29,9 +29,44 @@
         </div>
       </div>
 
-      @if (session('status'))
-        <div class="alert alert-success mb-4">{{ session('status') }}</div>
+      {{-- ======== Flash messages (ここを置き換え) ======== --}}
+      @if(session('success'))
+        <div class="alert alert-success mb-4" role="alert">
+          {{ session('success') }}
+        </div>
       @endif
+
+      @if(session('warning'))
+        <div class="alert alert-warning mb-4" role="alert">
+          {{ session('warning') }}
+        </div>
+      @endif
+
+      @if(session('error'))
+        <div class="alert alert-error mb-4" role="alert">
+          {{ session('error') }}
+        </div>
+      @endif
+
+      {{-- 既存互換: Laravelの「status」も拾う（例: パスワード更新など） --}}
+      @if (session('status'))
+        <div class="alert alert-success mb-4" role="alert">
+          {{ session('status') }}
+        </div>
+      @endif
+
+      {{-- バリデーションエラーまとめ表示（必要なければ削ってOK） --}}
+      @if ($errors->any())
+        <div class="alert alert-error mb-4" role="alert">
+          <div class="font-bold">入力内容を確認してください</div>
+          <ul class="list-disc ml-5">
+            @foreach ($errors->all() as $error)
+              <li>{{ $error }}</li>
+            @endforeach
+          </ul>
+        </div>
+      @endif
+      {{-- ======== /Flash messages ======== --}}
 
       @yield('content')
     </div>
@@ -43,6 +78,8 @@
           <li><a href="{{ route('admin.dashboard') }}">ダッシュボード</a></li>
           <li><a href="{{ route('admin.reservations.index') }}">予約一覧</a></li>
           <li><a href="{{ route('admin.slots.index') }}">枠（店/配）</a></li>
+          {{-- ★ 追加：商品管理 --}}
+          <li><a href="{{ route('admin.products.index') }}">商品管理</a></li>
           {{-- 今後：商品/在庫/配達エリア管理など --}}
         </ul>
       </aside>

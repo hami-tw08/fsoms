@@ -83,6 +83,20 @@ Route::middleware(['auth', IsAdmin::class])
         Route::get('/reservations/export', [AdminReservationController::class, 'export'])->name('reservations.export');
         Route::get('/reservations/{reservation}', [AdminReservationController::class, 'show'])->name('reservations.show');
 
+        // ▼▼▼ ここから追記：削除系 ▼▼▼
+        // 個別削除（1件）
+        Route::delete('/reservations/{reservation}', [AdminReservationController::class, 'destroy'])
+            ->name('reservations.destroy');
+
+        // 選択削除（複数IDをカンマ区切りで受け取る）
+        Route::delete('/reservations', [AdminReservationController::class, 'destroySelected'])
+            ->name('reservations.destroySelected');
+
+        // 全件削除（超危険操作）
+        Route::delete('/reservations-all', [AdminReservationController::class, 'destroyAll'])
+            ->name('reservations.destroyAll');
+        // ▲▲▲ 追記ここまで ▲▲▲
+
         // ▼ スロット管理（新UI：通知閾値／収容数の一括更新）
         Route::get('/slots', [AdminSlotController::class, 'index'])->name('slots.index');             // 一覧＆編集フォーム
         Route::post('/slots/bulk-update', [AdminSlotController::class, 'bulkUpdate'])->name('slots.bulk-update'); // 一括更新

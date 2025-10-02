@@ -1,4 +1,4 @@
-@extends('layouts.app')
+@extends('layouts.daisy')
 
 @section('title', '商品一覧')
 

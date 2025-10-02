@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Reservation;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Illuminate\Support\Facades\DB; // ★ 追記：一括削除トランザクション用
 
 class ReservationController extends Controller
 {
@@ -105,4 +106,66 @@ class ReservationController extends Controller
             'Content-Type' => 'text/csv; charset=UTF-8',
         ]);
     }
+
+    // ===== ここから追記：削除系 =====
+
+    /**
+     * 個別削除（1件）
+     */
+    public function destroy(Reservation $reservation)
+    {
+        try {
+            $reservation->delete();
+            return back()->with('success', '予約を削除しました');
+        } catch (\Throwable $e) {
+            report($e);
+            return back()->with('error', '削除に失敗しました');
+        }
+    }
+
+    /**
+     * 選択削除（複数IDをカンマ区切りで受け取る）
+     * リクエスト例: ids="1,2,5"
+     */
+    public function destroySelected(Request $request)
+    {
+        $ids = collect(explode(',', (string)$request->input('ids')))
+            ->filter(fn($v) => is_numeric($v))
+            ->map(fn($v) => (int)$v)
+            ->unique()
+            ->values();
+
+        if ($ids->isEmpty()) {
+            return back()->with('warning', '削除対象が選択されていません');
+        }
+
+        try {
+            DB::transaction(function () use ($ids) {
+                Reservation::whereIn('id', $ids)->delete();
+            });
+            return back()->with('success', '選択した予約を削除しました');
+        } catch (\Throwable $e) {
+            report($e);
+            return back()->with('error', '選択削除に失敗しました');
+        }
+    }
+
+    /**
+     * 全件削除（危険操作）
+     */
+    public function destroyAll()
+    {
+        try {
+            DB::transaction(function () {
+                // 外部キー制約を考慮して truncate は使わない
+                Reservation::query()->delete();
+            });
+            return back()->with('success', '全件削除しました');
+        } catch (\Throwable $e) {
+            report($e);
+            return back()->with('error', '全件削除に失敗しました');
+        }
+    }
+
+    // ===== 追記ここまで =====
 }
