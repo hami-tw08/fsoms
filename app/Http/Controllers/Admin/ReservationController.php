@@ -3,14 +3,15 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Admin\ReservationIndexRequest;
+//use App\Http\Requests\Admin\ReservationIndexRequest;
 use App\Models\Reservation;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ReservationController extends Controller
 {
-    public function index(ReservationIndexRequest $request)
+    //public function index(ReservationIndexRequest $request)
+    public function index(Request $request)
     {
         $q      = $request->input('q');
         $method = $request->input('method');
