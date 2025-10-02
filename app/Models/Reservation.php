@@ -8,6 +8,7 @@ use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Builder;
 
 class Reservation extends Model
@@ -17,40 +18,61 @@ class Reservation extends Model
      */
     public const DELIVERY_AREAS = ['浪江', '双葉', '大熊', '小高区'];
 
+    /**
+     * mass assignable（注文型＋スロット直結型の両対応）
+     */
     protected $fillable = [
+        // ── 注文（items/pivot）型のフィールド ──
         'order_code',
         'method',        // store|delivery
         'receive_date',  // Y-m-d
         'receive_time',  // H:i
-        'total',
-        'status',        // pending|confirmed など
-        // 注文者
+        'total',         // 注文型の合計（null のときは items 合算）
+        'status',        // pending|confirmed|completed|canceled 等
         'orderer_name',
         'orderer_phone',
-        // 配送時のみ
         'recipient_name',
         'recipient_company',
         'recipient_store',
-        'area',          // 配送エリア
+        'area',          // 配送エリア（注文型）
         'address',
+
+        // ── スロット直結型で使うフィールド（Controller側の create() 相当で利用）──
+        'slot_id',
+        'user_id',
+        'product_id',
+        'quantity',
+        'total_amount',           // スロット型の合計
+        'notes',
+        'delivery_area',          // 配送エリア（スロット型）
+        'delivery_postal_code',
+        'delivery_address',
+        'guest_name',
+        'guest_phone',
     ];
 
     protected $casts = [
         'receive_date' => 'date',
         'receive_time' => 'string',
+        'quantity'     => 'integer',
+        'total_amount' => 'integer',
     ];
 
     /**
      * API/配列化時に自動で含める仮想属性
      */
     protected $appends = [
-        'total_amount',
+        'total_amount_normalized',
         'receive_at',
         'display_name',
     ];
 
+    /* =========================
+     |  リレーション
+     * =======================*/
+
     /**
-     * 明細（1予約 : 多明細）
+     * 明細（1予約 : 多明細） … 注文型で使用
      */
     public function items(): HasMany
     {
@@ -58,8 +80,7 @@ class Reservation extends Model
     }
 
     /**
-     * 商品（多対多：reservation_items 経由）
-     * ->withPivot で数量/単価が取れるので集計UIで便利
+     * 商品（多対多：reservation_items 経由） … 注文型で使用
      */
     public function products(): BelongsToMany
     {
@@ -67,6 +88,34 @@ class Reservation extends Model
             ->withPivot(['quantity', 'unit_price'])
             ->withTimestamps();
     }
+
+    /**
+     * スロット（reservations.slot_id → reservation_slots.id） … スロット直結型で使用
+     */
+    public function slot(): BelongsTo
+    {
+        return $this->belongsTo(ReservationSlot::class, 'slot_id');
+    }
+
+    /**
+     * 単一商品（スロット直結型の予約で使用）
+     */
+    public function product(): BelongsTo
+    {
+        return $this->belongsTo(Product::class, 'product_id');
+    }
+
+    /**
+     * 予約ユーザー（ゲスト予約時はnull）
+     */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'user_id');
+    }
+
+    /* =========================
+     |  アクセサ
+     * =======================*/
 
     /**
      * 表示用氏名（今回は予約者＝orderer を優先）
@@ -77,20 +126,29 @@ class Reservation extends Model
     }
 
     /**
-     * 合計金額（totalがnullなら明細合算）
+     * 正規化した合計金額
+     * - 注文型: total（nullなら items 合算）
+     * - スロット型: total_amount を優先
      */
-    public function getTotalAmountAttribute(): int
+    public function getTotalAmountNormalizedAttribute(): int
     {
+        // スロット型の total_amount を最優先
+        if (!is_null($this->attributes['total_amount'] ?? null)) {
+            return (int) $this->attributes['total_amount'];
+        }
+
+        // 注文型の total があればそれ
         if (!is_null($this->attributes['total'] ?? null)) {
             return (int) $this->attributes['total'];
         }
-        // 明細から計算（quantity * unit_price の合計）
+
+        // 注文型の items 合算（リレーションの有無で分岐）
         if ($this->relationLoaded('items')) {
             return (int) $this->items->sum(function ($i) {
                 return (int) ($i->quantity ?? 0) * (int) ($i->unit_price ?? 0);
             });
         }
-        // 未ロード時はDB集計
+
         return (int) $this->items()
             ->selectRaw('COALESCE(SUM(quantity * unit_price), 0) as sum_total')
             ->value('sum_total');
@@ -98,8 +156,6 @@ class Reservation extends Model
 
     /**
      * 受取の「日時」アクセサ（Carbon）
-     * - dateのみ設定でtime空なら 00:00 扱い
-     * - dateが無ければ null
      */
     public function getReceiveAtAttribute(): ?Carbon
     {
@@ -115,38 +171,30 @@ class Reservation extends Model
         return Carbon::parse("{$date} {$time}", config('app.timezone'));
     }
 
-    /* =========================================================
-     |  検索スコープ（コントローラのフィルタで使えるように）
-     * =======================================================*/
+    /* =========================
+     |  検索スコープ（注文型向け）
+     * =======================*/
 
-    /** method絞り込み（store / delivery） */
     public function scopeMethod(Builder $q, ?string $method): Builder
     {
         return $method ? $q->where('method', $method) : $q;
     }
 
-    /** area絞り込み（配送エリア） */
     public function scopeArea(Builder $q, ?string $area): Builder
     {
         return $area ? $q->where('area', $area) : $q;
     }
 
-    /** 受取日 From（Y-m-d） */
     public function scopeReceiveFrom(Builder $q, ?string $from): Builder
     {
         return $from ? $q->whereDate('receive_date', '>=', $from) : $q;
     }
 
-    /** 受取日 To（Y-m-d） */
     public function scopeReceiveTo(Builder $q, ?string $to): Builder
     {
         return $to ? $q->whereDate('receive_date', '<=', $to) : $q;
     }
 
-    /**
-     * キーワード検索（氏名/電話/注文コード/住所/備考など）
-     * - 必要に応じて列を足してOK
-     */
     public function scopeKeyword(Builder $q, ?string $keyword): Builder
     {
         if (!$keyword) return $q;
@@ -160,7 +208,6 @@ class Reservation extends Model
               ->orWhere('address', 'like', $like)
               ->orWhere('area', 'like', $like);
 
-            // 完全一致でID検索したい場合
             if (ctype_digit($keyword)) {
                 $w->orWhere('id', (int) $keyword);
             }

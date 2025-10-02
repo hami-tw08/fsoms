@@ -9,12 +9,7 @@ class IsAdmin
 {
     public function handle(Request $request, Closure $next)
     {
-        // 未ログインはログインへ
-        if (!auth()->check()) {
-            return redirect()->route('login');
-        }
-
-        // 管理者でなければ403
+        // ここに来る時点で auth 済み（未ログインは既にリダイレクト済み）
         if (!($request->user()->is_admin ?? false)) {
             abort(403, 'Forbidden');
         }

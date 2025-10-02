@@ -13,8 +13,7 @@ use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\ProductController as AdminProductController;
 use App\Http\Controllers\Admin\ReservationController as AdminReservationController;
 use App\Http\Controllers\Admin\SlotController as AdminSlotController; // ★ 追加
-
-use App\Http\Middleware\IsAdmin; // ★ 追加（エイリアス is_admin を使う想定）
+use App\Http\Middleware\IsAdmin;
 
 /*
 |--------------------------------------------------------------------------
@@ -72,7 +71,7 @@ Route::get('/checkout/complete', [CheckoutController::class, 'complete'])->name(
 Route::get('/dashboard', fn () => view('dashboard'))->middleware(['auth', 'verified'])->name('dashboard');
 
 /** Admin */
-Route::middleware(['auth', 'is_admin'])
+Route::middleware(['auth', IsAdmin::class])
     ->prefix('admin')->name('admin.')
     ->group(function () {
 
