@@ -86,7 +86,7 @@
 
 {{-- ★ ステッパー（横並び・中央寄せ） --}}
 @php
-  $__steps = ['予約日時・受取り方法','商品の選択','予約者情報の入力','入力情報の確認','予約完了'];
+  $__steps = ['予約日時等を指定する','商品を選択する','注文者情報等を入力する','登録する情報を確認する','ご予約完了'];
 @endphp
 <div class="overflow-x-auto mb-4">
   <x-stepper
@@ -104,6 +104,12 @@
     <div class="lg:col-span-2">
       <div class="card bg-base-100 shadow-xl overflow-x-auto">
         <div class="card-body min-w-full">
+          <h2 class="text-lg md:text-xl font-bold">オンライン予約用カレンダー：予約日の指定</h2>
+          <div class="mt-3 flex flex-wrap gap-2 items-center">
+            <div class="badge badge-outline">カレンダーをクリックして日付を選択</div>
+            <div class="text-sm opacity-70">○：枠あり / ×：枠なし</div>
+            <div class="text-sm opacity-70">※ {{ $___minDateLabel }} より前は選べません</div>
+          </div>
           <div class="flex items-center justify-between">
             <a href="{{ route('reserve.create',['month'=>$prevMonth]) }}" class="btn btn-ghost">« Prev</a>
             <h3 class="card-title text-2xl">{{ $firstDay->format('Y年 n月') }}</h3>
@@ -181,11 +187,7 @@
             </div>
           </div>
 
-          <div class="mt-3 flex flex-wrap gap-2 items-center">
-            <div class="badge badge-outline">カレンダーをクリックして日付を選択</div>
-            <div class="text-xs opacity-70">○：枠あり / ×：枠なし</div>
-            <div class="text-xs opacity-70">※ {{ $___minDateLabel }} より前は選べません</div>
-          </div>
+
         </div>
       </div>
     </div>
@@ -196,9 +198,10 @@
         <div class="card-body">
           <h3 class="card-title">予約フォーム</h3>
 
-          <div class="text-xs text-gray-600 space-y-1 mb-2">
+          <div class="text-sm text-gray-600 space-y-1 mb-2">
             <div>ご予約のながれ：①カレンダーで日付を選択 → ②受取り方法を選択 → ③受取り希望時間を選択 → ④商品選択へ</div>
             <div>店：店頭受取り　配：配送</div>
+            <div>配送可能エリア：南相馬市小高区、浪江町、双葉町、大熊町</div>
             <div id="ruleHelper" class="opacity-80"></div>
           </div>
 
@@ -250,9 +253,9 @@
             </a>
           </div>
 
-          <div class="mt-3 text-xs text-gray-500">
+          <!-- <div class="mt-3 text-xs text-gray-500">
             配達エリア：浪江 / 双葉 / 大熊 / 小高区
-          </div>
+          </div> -->
         </div>
       </div>
     </div>
@@ -549,21 +552,24 @@
     timeSel.appendChild(new Option('選択してください','',true,true));
 
     for (const s of intersection) {
-      const range  = `${s.start}-${s.end}`;
-      const ruleCap = RULE_CAPACITY[m](range);
+      const range = `${s.start}-${s.end}`;
       const sr = s.serverRemaining;
 
-      let text = `${range}（残り${ruleCap}）`;
+      // デフォルトは「時間だけ」
+      let text = range;
       let disabled = false;
 
-      if (sr === 0) { text = `${range}（満席）`; disabled = true; }
+      // サーバーが満席 or 未提供のときのラベルだけは残す（必要なら下の2行ごと消してもOK）
+      if (sr === 0)   { text = `${range}（受付を終了しました）`;   disabled = true; }
       if (sr === null){ text = `${range}（準備中）`; disabled = true; }
 
       const opt = new Option(text, range);
-      opt.dataset.start = s.start; opt.dataset.end = s.end;
-      opt.disabled = disabled;
+      opt.dataset.start = s.start;
+      opt.dataset.end   = s.end;
+      opt.disabled      = disabled;
       timeSel.appendChild(opt);
     }
+
 
     timeSel.disabled = false;
     updateNextButtonState();

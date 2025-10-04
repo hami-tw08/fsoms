@@ -30,37 +30,69 @@ class ReservationController extends Controller
         $start = $firstDay->copy()->startOfWeek(Carbon::MONDAY);
         $end   = $firstDay->copy()->endOfMonth()->endOfWeek(Carbon::SUNDAY);
 
-        // === 月内の空き枠残数（店頭/配達）を集計 ===
+        // === 月内の空き枠残数（店頭/配達）を集計（曜日ルール内の時間帯のみ合算） ===
         $monthStart = $firstDay->copy()->startOfMonth()->toDateString();
         $monthEnd   = $firstDay->copy()->endOfMonth()->toDateString();
         $shopId = 1; // 1店舗運用
 
-        $rows = DB::table('reservation_slots as s')
+        // JSと同じ曜日ルールをPHPでも適用
+        $allowedRanges = function (string $date, string $type): array {
+            $dow = (int)Carbon::parse($date)->dayOfWeekIso; // 1=Mon ... 7=Sun
+            $key = ($dow === 3 || $dow === 5) ? 'WED_FRI'
+                  : (($dow === 4 || $dow === 6 || $dow === 7) ? 'THU_SAT_SUN' : null);
+            if (!$key) return [];
+            $RULES = [
+                'delivery' => [
+                    'WED_FRI'     => ['12:00-14:00','16:00-17:00','18:30-19:30'],
+                    'THU_SAT_SUN' => ['10:00-11:00','12:00-14:00','16:00-17:00','18:30-19:30'],
+                ],
+                'store' => [
+                    'WED_FRI'     => ['14:00-16:00','17:00-18:30'],
+                    'THU_SAT_SUN' => ['11:00-12:00','14:00-16:00','17:00-18:30'],
+                ],
+            ];
+            return $RULES[$type][$key] ?? [];
+        };
+
+        // 月のスロットを「スロット単位」で取得し、各スロットの残数(>=0)を出してから
+        // 曜日ルールで許可された時間帯だけ日次合算する
+        $slotRows = DB::table('reservation_slots as s')
             ->leftJoin('reservations as r', function ($j) {
                 $j->on('r.slot_id', '=', 's.id')
                   ->whereIn('r.status', ['booked', 'completed']);
             })
             ->where('s.shop_id', $shopId)
             ->whereBetween('s.slot_date', [$monthStart, $monthEnd])
-            ->whereDate('s.slot_date', '>=', $minDate->toDateString()) // ★ 3日前未満を除外
             ->where('s.is_active', true)
-            ->groupBy('s.slot_date', 's.slot_type')
+            ->groupBy('s.id','s.slot_date','s.slot_type','s.start_time','s.end_time','s.capacity')
+            ->orderBy('s.slot_date')->orderBy('s.start_time')
             ->get([
+                's.id',
                 's.slot_date',
                 's.slot_type',
-                DB::raw('SUM(s.capacity) as total_capacity'),
-                DB::raw('COUNT(r.id) as total_booked'),
+                's.start_time',
+                's.end_time',
+                DB::raw('GREATEST(s.capacity - COUNT(r.id), 0) as remaining_per_slot'),
             ]);
 
-        // stats['YYYY-MM-DD']['store'|'delivery'] = 残数
+        // stats['YYYY-MM-DD']['store'|'delivery'] = 残数（曜日ルール内のみ）
         $stats = [];
-        foreach ($rows as $row) {
-            $remaining = (int)$row->total_capacity - (int)$row->total_booked;
+        foreach ($slotRows as $row) {
+            // 3日前未満は集計しない（カレンダー側では before_min で × 表示）
+            if (Carbon::parse($row->slot_date)->lt($minDate)) continue;
+
+            $range = substr($row->start_time, 0, 5) . '-' . substr($row->end_time, 0, 5);
+            $allowed = $allowedRanges($row->slot_date, $row->slot_type);
+            if (!in_array($range, $allowed, true)) {
+                continue; // 曜日ルール外の時間帯は合算しない
+            }
+
             if (!isset($stats[$row->slot_date])) {
                 $stats[$row->slot_date] = ['store' => 0, 'delivery' => 0];
             }
-            $stats[$row->slot_date][$row->slot_type] = max(0, $remaining);
+            $stats[$row->slot_date][$row->slot_type] += (int)$row->remaining_per_slot;
         }
+
 
         // カレンダー配列（週ごと×7日）
         $weeks = [];
