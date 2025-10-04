@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
+use Illuminate\Support\Facades\DB; // ★ 追加：DB保存で使用
 
 class CheckoutController extends Controller
 {
@@ -161,13 +162,14 @@ class CheckoutController extends Controller
     }
 
     /**
-     * 注文確定（DB未保存 → 完了画面へ）
-     * - 同意チェックを廃止
-     * - 完了画面表示用の最小データを reservation.completed に保存してから、元セッションを掃除
+     * 注文確定（DB保存 → 完了画面へ）
+     * - 既存の完了画面表示は維持（セッション reservation.completed）
+     * - テーブル設計（reservations: slot_id/customer_id/product_id/...）に合わせて保存
+     * - 複数商品は「複数行のreservation」で対応
      */
     public function place(Request $request): RedirectResponse
     {
-        $cart = (array) session('reservation.cart', []);
+        $cart     = (array) session('reservation.cart', []);
         if (empty($cart)) {
             return redirect()->route('cart.index')->with('cart_error', 'カートが空です。');
         }
@@ -175,23 +177,132 @@ class CheckoutController extends Controller
         $meta     = (array) session('reservation.meta', []);
         $shipping = (array) session('reservation.shipping', []);
 
-        // 合計計算
+        // 必須メタ
+        $method    = $meta['method']     ?? null; // 'store'|'delivery'
+        $date      = $meta['date']       ?? null; // Y-m-d
+        $timeStart = $meta['time_start'] ?? ($meta['time'] ?? null); // H:i
+        $timeEnd   = $meta['time_end']   ?? null; // H:i or null
+
+        if (!in_array($method, ['store','delivery'], true) || !$date || !$timeStart) {
+            return redirect()->route('reserve.create')->with('cart_error', '受取方法・日時の情報が不足しています。');
+        }
+
+        // 合計計算（完了画面用）
         $total = 0;
         foreach ($cart as $row) {
             $total += (int) ($row['price'] ?? 0) * (int) ($row['qty'] ?? 0);
         }
 
-        // 配送料計算（confirm と同等）
-        $isDelivery   = ($meta['method'] ?? null) === 'delivery';
-        $deliveryArea = $shipping['area'] ?? null;
-        $deliveryFee  = $isDelivery ? (self::DELIVERY_FEES[$deliveryArea] ?? 900) : 0;
-        $grandTotal   = $total + $deliveryFee;
+        // 配送関連
+        $isDelivery = ($method === 'delivery');
+        $deliveryAreaJp = $shipping['area'] ?? null;
+        $deliveryFee = $isDelivery ? (self::DELIVERY_FEES[$deliveryAreaJp] ?? 900) : 0;
+        $grandTotal  = $total + $deliveryFee;
 
-        // 完了画面用に必要最小限を一時保存
+        // 日本語→enum（reservations.delivery_area）
+        $areaMap = ['浪江'=>'namie','双葉'=>'futaba','大熊'=>'okuma','小高区'=>'odaka'];
+        $deliveryAreaEnum = $isDelivery ? ($areaMap[$deliveryAreaJp] ?? null) : null;
+
+        // ★★★ 追加：ここで user_id を取得（ゲストは null）
+        $userId = optional($request->user())->id;
+
+        // ===== DB保存（トランザクション） =====
+        try {
+            DB::transaction(function () use ($cart, $method, $date, $timeStart, $timeEnd, $isDelivery, $deliveryAreaEnum, $shipping, $userId) {
+                // 1) スロット特定（1店舗運用）
+                $slotQ = DB::table('reservation_slots')
+                    ->where('shop_id', 1)
+                    ->whereDate('slot_date', $date)
+                    ->where('slot_type', $method)
+                    ->where('start_time', $timeStart . ':00');
+
+                if (!empty($timeEnd)) {
+                    $slotQ->where('end_time', $timeEnd . ':00');
+                }
+
+                $slot = $slotQ->lockForUpdate()->first();
+                if (!$slot) {
+                    throw new \RuntimeException('該当する予約枠が見つかりませんでした。別の時間をお選びください。');
+                }
+
+                // 2) 空き確認（booked/completed）
+                $booked = DB::table('reservations')
+                    ->where('slot_id', $slot->id)
+                    ->whereIn('status', ['booked','completed'])
+                    ->lockForUpdate()
+                    ->count();
+
+                if ($booked >= (int) $slot->capacity) {
+                    throw new \RuntimeException('申し訳ありません。この枠は満席になりました。別の時間をお選びください。');
+                }
+
+                // 3) 顧客レコード（customers）準備：電話で同定
+                $ordererName  = $shipping['orderer_name']  ?? '';
+                $ordererPhone = $shipping['orderer_phone'] ?? '';
+                if (!$ordererName || !$ordererPhone) {
+                    throw new \RuntimeException('注文者の氏名・電話が不足しています。');
+                }
+
+                $customer = DB::table('customers')->where('phone', $ordererPhone)->first();
+                if (!$customer) {
+                    $customerId = DB::table('customers')->insertGetId([
+                        'name'       => $ordererName,
+                        'phone'      => $ordererPhone,
+                        'email'      => null,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                } else {
+                    $customerId = $customer->id;
+                }
+
+                // 4) カートの各商品を reservations へ登録（複数商品→複数レコード）
+                foreach ($cart as $row) {
+                    $productId = (int)($row['product_id'] ?? 0);
+                    $qty       = (int)($row['qty'] ?? 0);
+                    $price     = (int)($row['price'] ?? 0);
+                    if ($productId <= 0 || $qty <= 0) {
+                        continue;
+                    }
+
+                    // 外部キーエラー回避のため products の存在確認
+                    $productExists = DB::table('products')->where('id', $productId)->exists();
+                    if (!$productExists) {
+                        continue; // 見つからなければこの行は保存スキップ
+                    }
+
+                    DB::table('reservations')->insert([
+                        'slot_id'      => $slot->id,
+                        'user_id'      => $userId, // ★ ここで利用
+                        'customer_id'  => $customerId,
+                        'product_id'   => $productId,
+                        'quantity'     => $qty,
+                        'total_amount' => $price * $qty, // decimal(10,2) に整数円で投入OK
+                        'status'       => 'booked',
+                        'notes'        => $shipping['notes'] ?? null,
+
+                        // 配達関連（配達時のみ）
+                        'delivery_area'        => $isDelivery ? $deliveryAreaEnum : null,
+                        'delivery_postal_code' => $isDelivery ? ($shipping['postal_code'] ?? null) : null,
+                        'delivery_address'     => $isDelivery ? ($shipping['address'] ?? null)      : null,
+
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                }
+            });
+
+        } catch (\Throwable $e) {
+            report($e);
+            return redirect()->route('checkout.confirm')
+                ->with('cart_error', $e->getMessage() ?: '予約の保存に失敗しました。もう一度お試しください。');
+        }
+
+        // ===== 完了画面用セッション（従来どおり維持） =====
         session()->put('reservation.completed', [
             'cart'         => $cart,
             'meta'         => $meta,
-            'deliveryArea' => $deliveryArea,
+            'deliveryArea' => $shipping['area'] ?? null,
             'total'        => $total,
             'deliveryFee'  => $deliveryFee,
             'grandTotal'   => $grandTotal,

@@ -63,11 +63,11 @@
 
         <hr class="opacity-20">
 
-        {{-- 添付テキスト：スマホでもPCでも常に表示（必要に応じて編集OK） --}}
-        <div class="text-sm leading-relaxed whitespace-pre-line">
-          ご予約について
-          店頭受取、または配送のご予約を承ります（3日前まで）
-        </div>
+        <!-- {{-- 添付テキスト：スマホでもPCでも常に表示（必要に応じて編集OK） --}} -->
+        <!-- <div class="text-sm leading-relaxed whitespace-pre-line"> -->
+          <!-- ご予約について -->
+          <!-- 店頭受取、または配送のご予約を承ります（3日前まで） -->
+        <!-- </div> -->
       </div>
     </div>
   </div>

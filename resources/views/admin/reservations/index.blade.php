@@ -73,19 +73,20 @@
     <tbody>
     @forelse ($reservations as $r)
       @php
-        // 予約日時はスロットのstart_atを優先
-        $start = $r->slot?->start_at?->timezone(config('app.timezone'));
-        $date  = $start?->format('Y-m-d') ?? '—';
-        $time  = $start?->format('H:i') ?? '—';
+        // ▼ スロット情報（slot_date: Carbon, start_time: "HH:MM:SS"）
+        $slot   = $r->slot;
+        $date   = $slot?->slot_date ? \Illuminate\Support\Carbon::parse($slot->slot_date)->format('Y-m-d') : '—';
+        $time   = $slot?->start_time ? substr((string)$slot->start_time, 0, 5) : '—';
 
-        // 受取方法
-        $methodLabel = match($r->method ?? null) {
+        // ▼ 受取方法はスロットの種別から（reservations.method は使わない）
+        $slotType    = $slot->slot_type ?? null; // 'store'|'delivery'
+        $methodLabel = match($slotType) {
           'store' => '店頭',
           'delivery' => '配達',
           default => '—',
         };
 
-        // 合計金額（存在する情報でフォールバック）
+        // ▼ 合計金額（存在する情報でフォールバック）
         $amount = $r->total_amount
           ?? ((isset($r->unit_price, $r->quantity)) ? ((int)$r->unit_price * (int)$r->quantity) : null)
           ?? ($r->product->price ?? null);
@@ -97,9 +98,9 @@
         <td>{{ $date }}</td>
         <td>{{ $time }}</td>
         <td>
-          @if(($r->method ?? null) === 'store')
+          @if($slotType === 'store')
             <span class="badge badge-primary">店頭</span>
-          @elseif(($r->method ?? null) === 'delivery')
+          @elseif($slotType === 'delivery')
             <span class="badge badge-secondary">配達</span>
           @else
             <span class="badge">—</span>
@@ -116,7 +117,7 @@
           @endif
         </td>
         <td class="text-right font-semibold">
-          {{ isset($amount) ? number_format($amount) . '円' : '—' }}
+          {{ isset($amount) ? number_format((int)$amount) . '円' : '—' }}
         </td>
         <td class="text-right">
           <form action="{{ route('admin.reservations.destroy', $r) }}" method="POST" onsubmit="return confirm('この予約を削除します。よろしいですか？');" class="inline">

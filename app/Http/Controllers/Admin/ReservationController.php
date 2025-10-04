@@ -32,13 +32,17 @@ class ReservationController extends Controller
                       ->orWhere('product_id', $q);  // 完全一致商品ID
                 });
             })
-            ->when($method, fn($q) => $q->where('method', $method))
+            // ▼ ここを修正：method列ではなくスロット種別 slot_type を参照
+            ->when($method, function($q) use ($method) {
+                $q->whereHas('slot', fn($s) => $s->where('slot_type', $method));
+            })
             ->when($area,   fn($q) => $q->where('delivery_area', $area))
+            // ▼ ここを修正：日付は reservation_slots.slot_date を参照
             ->when($from, function($q) use ($from) {
-                $q->whereHas('slot', fn($s) => $s->whereDate('start_at', '>=', $from));
+                $q->whereHas('slot', fn($s) => $s->whereDate('slot_date', '>=', $from));
             })
             ->when($to, function($q) use ($to) {
-                $q->whereHas('slot', fn($s) => $s->whereDate('start_at', '<=', $to));
+                $q->whereHas('slot', fn($s) => $s->whereDate('slot_date', '<=', $to));
             })
             ->latest('id')
             ->paginate(20);
@@ -69,13 +73,16 @@ class ReservationController extends Controller
                       ->orWhere('product_id', $q);
                 });
             })
-            ->when($indexRequest->method(), fn($q) => $q->where('method', $indexRequest->method()))
+            // ▼ ここも index と同様に slot_type/slot_date を参照
+            ->when($indexRequest->method(), function($q) use ($indexRequest) {
+                $q->whereHas('slot', fn($s) => $s->where('slot_type', $indexRequest->method()));
+            })
             ->when($indexRequest->area(),   fn($q) => $q->where('delivery_area', $indexRequest->area()))
             ->when($indexRequest->date('from'), function($q) use ($indexRequest) {
-                $q->whereHas('slot', fn($s) => $s->whereDate('start_at', '>=', $indexRequest->date('from')));
+                $q->whereHas('slot', fn($s) => $s->whereDate('slot_date', '>=', $indexRequest->date('from')));
             })
             ->when($indexRequest->date('to'), function($q) use ($indexRequest) {
-                $q->whereHas('slot', fn($s) => $s->whereDate('start_at', '<=', $indexRequest->date('to')));
+                $q->whereHas('slot', fn($s) => $s->whereDate('slot_date', '<=', $indexRequest->date('to')));
             })
             ->latest('id');
 
@@ -87,15 +94,26 @@ class ReservationController extends Controller
             fputcsv($out, ['id','slot_start','slot_id','guest_name','guest_phone','product_id','product_name','method','delivery_area','created_at']);
             $query->chunk(500, function($rows) use ($out) {
                 foreach ($rows as $r) {
+                    // ▼ start_at がモデルに無い構造なので slot_date + start_time から生成
+                    $slot = $r->slot;
+                    $slotStart = '';
+                    if ($slot) {
+                        $date = $slot->slot_date ? \Illuminate\Support\Carbon::parse($slot->slot_date)->format('Y-m-d') : '';
+                        $time = $slot->start_time ? substr((string)$slot->start_time, 0, 5) : '';
+                        $slotStart = trim($date.' '.$time);
+                    }
+                    // ▼ method はスロット種別（store|delivery）
+                    $method = $slot->slot_type ?? null;
+
                     fputcsv($out, [
                         $r->id,
-                        optional($r->slot)->start_at?->format('Y-m-d H:i'),
+                        $slotStart,
                         $r->slot_id,
                         $r->guest_name,
                         $r->guest_phone,
                         $r->product_id,
                         optional($r->product)->name,
-                        $r->method,
+                        $method,
                         $r->delivery_area,
                         optional($r->created_at)?->format('Y-m-d H:i:s'),
                     ]);
