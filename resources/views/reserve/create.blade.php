@@ -84,17 +84,34 @@
     </div>
   </div>
 
-{{-- ★ ステッパー（横並び・中央寄せ） --}}
+{{-- ▼ ステッパー（現在=1） --}}
 @php
-  $__steps = ['予約日時等を指定する','商品を選択する','注文者情報等を入力する','登録する情報を確認する','ご予約完了'];
+  $steps = [
+    1 => ['label' => '予約日時等を指定する', 'route' => route('reserve.create')],
+    2 => ['label' => '商品を選択する',       'route' => route('products.index')],
+    3 => ['label' => '注文者情報等を入力する','route' => route('checkout.shipping')],
+    4 => ['label' => '登録する情報を確認する','route' => route('checkout.confirm')],  // ルート名はプロジェクトに合わせて
+    5 => ['label' => 'ご予約完了',           'route' => route('checkout.complete', [], false) ?? '#' ], // 無ければ'#'
+  ];
+  $current = 1;
 @endphp
 <div class="overflow-x-auto mb-4">
-  <x-stepper
-    :steps="$__steps"
-    :current="1"
-    :verticalOnSm="false"
-    :showLabels="true"
-    class="justify-center w-full mx-auto max-w-4xl gap-3 min-w-max" />
+  <ul class="steps w-full justify-center mx-auto max-w-4xl min-w-max gap-3" data-stepper>
+    @foreach($steps as $i => $s)
+      <li class="step {{ $i <= $current ? 'step-primary' : '' }}"
+          @if($i < $current) data-href="{{ $s['route'] }}" @endif>
+        @if($i < $current)
+          <a href="{{ $s['route'] }}" class="block -mx-2 px-2 py-1 group">
+            <span class="text-xs sm:text-sm">{{ $s['label'] }}</span>
+          </a>
+        @else
+          <span class="block -mx-2 px-2 py-1 {{ $i === $current ? 'font-semibold' : '' }}">
+            <span class="text-xs sm:text-sm">{{ $s['label'] }}</span>
+          </span>
+        @endif
+      </li>
+    @endforeach
+  </ul>
 </div>
 
 

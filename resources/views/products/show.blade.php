@@ -12,18 +12,41 @@
     </ul>
   </div>
 
-  {{-- ▼ ステッパー（現在=2：商品の選択） --}}
-  @php
-    $__steps = ['予約日時等を指定する','商品を選択する','注文者情報等を入力する','登録する情報を確認する','ご予約完了'];
-  @endphp
-  <div class="overflow-x-auto mb-6" data-theme="namieflower">
-    <x-stepper
-      :steps="$__steps"
-      :current="2"
-      :verticalOnSm="false"
-      :showLabels="true"
-      class="justify-center w-full mx-auto max-w-4xl gap-3 min-w-max" />
-  </div>
+{{-- ▼ ステッパー（現在=2：商品の選択） --}}
+<div class="overflow-x-auto mb-6" data-theme="namieflower">
+  <ul class="steps steps-horizontal justify-center w-full mx-auto max-w-4xl gap-3 min-w-max">
+    {{-- 1：戻り禁止（リンクなし） --}}
+    <li class="step step-primary relative shrink-0">
+      <span class="mt-1 block text-[11px] md:text-sm leading-tight max-w-[9rem] mx-auto pointer-events-none relative z-[1]">
+        予約日時等を指定する
+      </span>
+    </li>
+
+    {{-- 2：現ステップ（太字・同ページなのでリンク不要） --}}
+    <li class="step step-primary relative shrink-0">
+      <span class="mt-1 block text-[11px] md:text-sm leading-tight max-w-[9rem] mx-auto pointer-events-none relative z-[1] font-semibold">
+        商品を選択する
+      </span>
+    </li>
+
+    {{-- 3以降：未完了 --}}
+    <li class="step relative shrink-0">
+      <span class="mt-1 block text-[11px] md:text-sm leading-tight max-w-[9rem] mx-auto pointer-events-none relative z-[1]">
+        注文者情報等を入力する
+      </span>
+    </li>
+    <li class="step relative shrink-0">
+      <span class="mt-1 block text-[11px] md:text-sm leading-tight max-w-[9rem] mx-auto pointer-events-none relative z-[1]">
+        登録する情報を確認する
+      </span>
+    </li>
+    <li class="step relative shrink-0">
+      <span class="mt-1 block text-[11px] md:text-sm leading-tight max-w-[9rem] mx-auto pointer-events-none relative z-[1]">
+        ご予約完了
+      </span>
+    </li>
+  </ul>
+</div>
   {{-- ▲ ステッパーここまで --}}
 
 

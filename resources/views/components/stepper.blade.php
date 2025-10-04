@@ -1,26 +1,56 @@
 @props([
+  // ['予約日時…','商品を選択…',...] の配列 or 1始まりの連想配列
   'steps' => [],
+  // 現在位置（1始まり）
   'current' => 1,
-  'verticalOnSm' => true,
+  // sm以下で縦並びにするか
+  'verticalOnSm' => false,
+  // ラベル表示するか
   'showLabels' => true,
+  // 「1へ戻る」を禁止（= true）※ご要望どおり
+  'banBackToOne' => true,
+  // 追加クラス
+  'class' => '',
 ])
 
 @php
-  $cur = (int) $current;
-  $wrapper = $verticalOnSm ? 'steps steps-vertical lg:steps-horizontal' : 'steps steps-horizontal';
+  // steps を 1始まりの配列に正規化
+  $labels = [];
+  $i = 1;
+  foreach ($steps as $k => $v) {
+    $labels[$i] = is_array($v) ? ($v['label'] ?? (string)$v) : (string)$v;
+    $i++;
+  }
+
+  // 水平/垂直クラス決定（daisyUI steps）
+  $orientation = $verticalOnSm ? 'steps-vertical sm:steps-horizontal' : 'steps-horizontal';
+
+  // クラス合成
+  $ulClass = trim("steps {$orientation} {$class}");
 @endphp
 
-<ol {{ $attributes->merge(['class' => $wrapper]) }} data-current="{{ $cur }}">  {{-- ★ 追加 --}}
-  @foreach($steps as $i => $label)
-    @php $index = $i + 1; @endphp
-    <li @class([
-          'step',
-          'step-secondary' => $index === $cur, // 現在
-          'step-primary'   => $index <  $cur,  // 完了
-        ])>
-      @if($showLabels)
-        <span class="mt-1 block text-[11px] md:text-sm leading-tight max-w-[9rem] mx-auto">{{ $label }}</span>
-      @endif
-    </li>
-  @endforeach
-</ol>
+<div class="w-full">
+  <div class="overflow-x-auto">
+    <ul class="{{ $ulClass }}">
+      @foreach ($labels as $idx => $label)
+        @php
+          $isDone = $idx <= $current;
+          $liClass = $isDone ? 'step step-primary' : 'step';
+        @endphp
+
+        <li class="{{ $liClass }} relative shrink-0">
+          {{-- ラベル --}}
+          @if($showLabels)
+            <span class="mt-1 block text-[11px] md:text-sm leading-tight max-w-[9rem] mx-auto pointer-events-none relative z-[1] {{ $idx === $current ? 'font-semibold' : '' }}">
+              {{ $label }}
+            </span>
+          @endif
+
+          {{-- ※このコンポーネントは「リンクは張らない」。 
+               どこに飛ぶかは“呼び出し側”が <a> で覆う想定にすると役割分離でき、
+               foreach の崩れや入れ子の事故も防げます。 --}}
+        </li>
+      @endforeach
+    </ul>
+  </div>
+</div>

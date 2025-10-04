@@ -6,18 +6,38 @@
 <div data-theme="namieflower">
   <h1 class="text-2xl font-bold mb-2">商品を選択</h1>
 
-  {{-- ▼ daisyUI Steps（現在=2） --}}
-  @php
-    $__steps = ['予約日時等を指定する','商品を選択する','注文者情報等を入力する','登録する情報を確認する','ご予約完了'];
-  @endphp
-  <div class="overflow-x-auto mb-6">
-    <x-stepper
-      :steps="$__steps"
-      :current="2"
-      :verticalOnSm="false"
-      :showLabels="true"
-      class="justify-center w-full mx-auto max-w-4xl gap-3 min-w-max" />
-  </div>
+{{-- ▼ ステッパー（現在=2） --}}
+@php
+  $steps = [
+    1 => '予約日時等を指定する',
+    2 => '商品を選択する',
+    3 => '注文者情報等を入力する',
+    4 => '登録する情報を確認する',
+    5 => 'ご予約完了',
+  ];
+  $current = 2; // いまの画面
+@endphp
+
+<div class="overflow-x-auto mb-6" data-theme="namieflower">
+  <ul class="steps steps-horizontal justify-center w-full mx-auto max-w-4xl gap-3 min-w-max">
+    @foreach ($steps as $i => $label)
+      @php $isDone = $i <= $current; @endphp
+      <li class="{{ $isDone ? 'step step-primary' : 'step' }} relative shrink-0">
+        {{-- 戻りリンク：1へは不可。2の画面なので i<2 は「1」しか該当しない＝リンクなし --}}
+        @if ($i < $current && $i !== 1)
+          <a
+            href="{{ $i === 2 ? route('products.index') : '#' }}"
+            class="absolute inset-0 z-[2] block"
+            aria-label="{{ $label }}"></a>
+        @endif
+        <span class="mt-1 block text-[11px] md:text-sm leading-tight max-w-[9rem] mx-auto pointer-events-none relative z-[1] {{ $i === $current ? 'font-semibold' : '' }}">
+          {{ $label }}
+        </span>
+      </li>
+    @endforeach
+  </ul>
+</div>
+
 
   @if($products->isEmpty())
     <div class="alert alert-warning">現在、販売中の商品はありません。</div>

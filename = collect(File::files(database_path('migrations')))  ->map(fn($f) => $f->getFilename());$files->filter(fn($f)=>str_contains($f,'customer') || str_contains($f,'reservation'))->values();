@@ -1,0 +1,53 @@
+[90m= [39m[34;4mIlluminate\Support\Collection[39;24m {#6180
+    [34mall[39m: [
+      {#6177
+        +"[1mid[22m": [35m26[39m,
+        +"[1mmigration[22m": "[32m2025_10_04_020453_make_user_id_nullable_on_reservations_table[39m",
+      },
+      {#6175
+        +"[1mid[22m": [35m25[39m,
+        +"[1mmigration[22m": "[32m2025_10_04_004941_add_customer_id_to_reservations_table[39m",
+      },
+      {#6176
+        +"[1mid[22m": [35m24[39m,
+        +"[1mmigration[22m": "[32m2025_10_03_033259_create_customers_table[39m",
+      },
+      {#6173
+        +"[1mid[22m": [35m19[39m,
+        +"[1mmigration[22m": "[32m2025_09_12_053129_add_guest_and_channel_to_reservations_table[39m",
+      },
+      {#6170
+        +"[1mid[22m": [35m14[39m,
+        +"[1mmigration[22m": "[32m2025_09_07_053522_add_guest_fields_to_reservations_table[39m",
+      },
+      {#6169
+        +"[1mid[22m": [35m13[39m,
+        +"[1mmigration[22m": "[32m2025_09_07_044629_drop_customers_table[39m",
+      },
+      {#6171
+        +"[1mid[22m": [35m12[39m,
+        +"[1mmigration[22m": "[32m2025_09_07_044407_change_reservations_customer_to_user[39m",
+      },
+      {#6168
+        +"[1mid[22m": [35m11[39m,
+        +"[1mmigration[22m": "[32m2025_09_07_044211_add_customer_fields_to_users_table[39m",
+      },
+      {#6167
+        +"[1mid[22m": [35m10[39m,
+        +"[1mmigration[22m": "[32m2025_09_06_071733_fix_uq_slots_on_reservation_slots[39m",
+      },
+      {#6166
+        +"[1mid[22m": [35m9[39m,
+        +"[1mmigration[22m": "[32m2025_09_06_063857_create_reservations_table[39m",
+      },
+      {#6165
+        +"[1mid[22m": [35m8[39m,
+        +"[1mmigration[22m": "[32m2025_09_06_063844_create_reservation_slots_table[39m",
+      },
+      {#6164
+        +"[1mid[22m": [35m6[39m,
+        +"[1mmigration[22m": "[32m2025_09_06_063818_create_customers_table[39m",
+      },
+    ],
+  }
+

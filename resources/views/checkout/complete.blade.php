@@ -6,18 +6,38 @@
 <div class="container mx-auto p-4">
 
   {{-- ▼ ステッパー（現在=5：予約完了） --}}
-  @php
-    $__steps = ['予約日時等を指定する','商品を選択する','注文者情報等を入力する','登録する情報を確認する','ご予約完了'];
-  @endphp
-  <div class="overflow-x-auto mb-4" data-theme="namieflower">
-    <x-stepper
-      :steps="$__steps"
-      :current="5"
-      :verticalOnSm="false"
-      :showLabels="true"
-      class="justify-center w-full mx-auto max-w-4xl gap-3 min-w-max" />
-  </div>
-  {{-- ▲ ステッパーここまで --}}
+@php
+  $steps = [
+    1 => '予約日時等を指定する',
+    2 => '商品を選択する',
+    3 => '注文者情報等を入力する',
+    4 => '登録する情報を確認する',
+    5 => 'ご予約完了',
+  ];
+  $current = 5;
+@endphp
+
+<div class="overflow-x-auto mb-4" data-theme="namieflower">
+  <ul class="steps steps-horizontal md:max-w-4xl md:mx-auto gap-3 min-w-max">
+    @foreach ($steps as $i => $label)
+      @php $isDone = $i <= $current; @endphp
+      <li class="{{ $isDone ? 'step step-primary' : 'step' }} relative shrink-0">
+        {{-- 1は禁止、2/3/4へ戻れる --}}
+        @if ($i < $current && $i !== 1)
+          <a
+            href="{{ $i === 2 ? route('products.index')
+                    : ($i === 3 ? route('checkout.shipping')
+                    : ($i === 4 ? route('checkout.confirm') : '#')) }}"
+            class="absolute inset-0 z-[2] block"
+            aria-label="{{ $label }}"></a>
+        @endif
+        <span class="mt-1 block text-[11px] md:text-sm leading-tight max-w-[9rem] mx-auto pointer-events-none relative z-[1] {{ $i === $current ? 'font-semibold' : '' }}">
+          {{ $label }}
+        </span>
+      </li>
+    @endforeach
+  </ul>
+</div>
 
   {{-- 完了メッセージ --}}
   <div class="card bg-base-100 shadow p-8 mb-6">

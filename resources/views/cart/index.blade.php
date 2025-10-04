@@ -1,24 +1,55 @@
 @extends('layouts.daisy')
 
-@section('title','予約商品一覧')
+@section('title', 'カート')
 
 @section('content')
-<div class="container mx-auto p-4 space-y-6">
-  <h1 class="text-2xl font-bold">予約商品一覧</h1>
+<div class="container mx-auto p-4">
+  {{-- パンくず --}}
+  <div class="text-sm breadcrumbs mb-3">
+    <ul>
+      <li><a href="{{ route('products.index') }}">商品一覧</a></li>
+      <li>カート</li>
+    </ul>
+  </div>
 
-  {{-- ▼ ステッパー（現在=2：商品の選択） --}}
-  @php
-    $__steps = ['予約日時等を指定する','商品を選択する','注文者情報等を入力する','登録する情報を確認する','ご予約完了'];
-  @endphp
-  <div class="overflow-x-auto mb-4" data-theme="namieflower">
-    <x-stepper
-      :steps="$__steps"
-      :current="2"
-      :verticalOnSm="false"
-      :showLabels="true"
-      class="justify-center w-full mx-auto max-w-4xl gap-3 min-w-max" />
+  {{-- ▼ ステッパー（現在=2：商品を選択/カート） --}}
+  <div class="overflow-x-auto mb-6" data-theme="namieflower">
+    <ul class="steps steps-horizontal justify-center w-full mx-auto max-w-4xl gap-3 min-w-max">
+      {{-- 1：戻り禁止（リンクなし） --}}
+      <li class="step step-primary relative shrink-0">
+        <span class="mt-1 block text-[11px] md:text-sm leading-tight max-w-[9rem] mx-auto pointer-events-none relative z-[1]">
+          予約日時等を指定する
+        </span>
+      </li>
+
+      {{-- 2：現ステップ（必要なら商品一覧へ戻るリンクを張る） --}}
+      <li class="step step-primary relative shrink-0">
+        {{-- 2は「同じ工程」への導線として商品一覧へ戻るリンクを付与してもOK --}}
+        <a href="{{ route('products.index') }}" class="absolute inset-0 z-[2] block" aria-label="商品を選択する"></a>
+        <span class="mt-1 block text-[11px] md:text-sm leading-tight max-w-[9rem] mx-auto pointer-events-none relative z-[1] font-semibold">
+          商品を選択する
+        </span>
+      </li>
+
+      <li class="step relative shrink-0">
+        <span class="mt-1 block text-[11px] md:text-sm leading-tight max-w-[9rem] mx-auto pointer-events-none relative z-[1]">
+          注文者情報等を入力する
+        </span>
+      </li>
+      <li class="step relative shrink-0">
+        <span class="mt-1 block text-[11px] md:text-sm leading-tight max-w-[9rem] mx-auto pointer-events-none relative z-[1]">
+          登録する情報を確認する
+        </span>
+      </li>
+      <li class="step relative shrink-0">
+        <span class="mt-1 block text-[11px] md:text-sm leading-tight max-w-[9rem] mx-auto pointer-events-none relative z-[1]">
+          ご予約完了
+        </span>
+      </li>
+    </ul>
   </div>
   {{-- ▲ ステッパーここまで --}}
+
 
   @if(session('cart_error'))
     <div class="alert alert-error">{{ session('cart_error') }}</div>
