@@ -38,6 +38,29 @@
   </ul>
 </div>
 
+{{-- ▼ 現在の選択（受取方法・受取日時） --}}
+<div class="mb-4 text-sm text-gray-600">
+  <div>（現在の選択）受取方法：
+    <span class="font-semibold">
+       {{ ['delivery' => '配送', 'store' => '店頭受取'][$meta['method'] ?? ''] ?? '未選択' }}
+    </span>
+  </div>
+
+    @php
+    $date = $meta['date'] ?? null;
+    $time = $meta['time'] ?? null;
+    @endphp
+
+  @if($date && $time)
+    <div>受取日時：<span class="font-semibold">{{ $date }} {{ $time }}</span></div>
+  @elseif($date)
+    <div>受取日：<span class="font-semibold">{{ $date }}</span></div>
+  @elseif($time)
+    <div>希望受取り時間：<span class="font-semibold">{{ $time }}</span></div>
+  @endif
+</div>
+
+
 
   @if($products->isEmpty())
     <div class="alert alert-warning">現在、販売中の商品はありません。</div>

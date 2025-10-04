@@ -222,6 +222,13 @@ public function store(StoreReservationRequest $request)
             'time_end'   => $validated['receive_time_end']   ?? null,
         ]);
 
+        session([
+            'reservation.method'   => $validated['receive_method'],
+            'reservation.date'     => $validated['receive_date'],
+            'reservation.time'     => $validated['receive_time'],
+            'reservation.datetime' => $validated['receive_date'].' '.$validated['receive_time'],
+        ]);
+
         // まずは予約トップに戻して案内（products.index 未定義でも落ちない）
         return redirect()
             ->route('reserve.create', $request->only('month'))

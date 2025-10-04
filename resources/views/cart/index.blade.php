@@ -161,7 +161,7 @@
                 'btn-disabled pointer-events-none opacity-50' => !$g['canProceed'],
               ])
             >
-              次へ（配送先情報）
+              次へ（注文者情報等の入力）
             </a>
           </div>
         </div>

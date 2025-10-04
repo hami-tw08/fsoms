@@ -17,7 +17,13 @@ class ProductController extends Controller
             ->orderByDesc('id')
             ->paginate(9);
 
-        return view('products.index', compact('products'));
+    // ▼ 受取メタをセッションの正規キーから取得
+    $meta = [
+        'method' => session('reservation.method'),
+        'date'   => session('reservation.date'),
+        'time'   => session('reservation.time'),
+    ];
+        return view('products.index', compact('products', 'meta'));
     }
 
     // フロント：詳細（slugバインド）

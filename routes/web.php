@@ -29,6 +29,9 @@ Route::redirect('/', '/reserve');
 Route::get('/reserve', [ReservationController::class, 'create'])->name('reserve.create');
 Route::post('/reserve', [ReservationController::class, 'store'])->name('reserve.store');
 Route::post('/reserve/create-step', [ReservationController::class, 'storeCreateStep'])->name('reserve.storeCreateStep');
+// 互換：昔の 'reservations.create' を 'reserve.create' へ301で流す
+Route::get('/reservations/create', fn () => redirect()->route('reserve.create'), 301)
+    ->name('reservations.create');
 
 // 空き枠API
 Route::get('/slots', [ReservationController::class, 'slots'])->name('public.slots');
