@@ -21,7 +21,7 @@ class ReservationController extends Controller
         $to     = $request->date('to');   // Y-m-d
 
         $reservations = Reservation::query()
-            ->with(['slot','product'])
+            ->with(['slot','product','customer'])
             ->when($q, function($query, $q) {
                 $like = '%'.$q.'%';
                 $query->where(function($w) use ($like, $q) {

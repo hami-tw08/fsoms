@@ -2,168 +2,97 @@
 @section('title','予約一覧')
 
 @section('content')
-<div class="flex items-center justify-between mb-4 gap-2">
-  {{-- ▼▼▼ 検索・CSV はUIを非表示（コードは残す） ▼▼▼
-  <form method="GET" class="w-full">
-    <div class="flex flex-wrap items-center gap-2">
-      <input class="input input-bordered grow" type="text" name="q"
-             value="{{ request('q') }}" placeholder="氏名/電話/備考/ID/商品…">
+<div class="space-y-4">
+  <h1 class="text-2xl font-bold">予約一覧</h1>
 
-      <select class="select select-bordered" name="method">
-        <option value="">受取/配達(すべて)</option>
-        <option value="store" @selected(request('method')==='store')>店頭</option>
-        <option value="delivery" @selected(request('method')==='delivery')>配達</option>
-      </select>
+  {{-- フラッシュ/エラーは layouts.admin 側で表示済み --}}
 
-      <select class="select select-bordered" name="area">
-        <option value="">配送エリア(すべて)</option>
-        @foreach (['浪江','小高区','双葉','大熊'] as $area)
-          <option value="{{ $area }}" @selected(request('area')===$area)>{{ $area }}</option>
+  <div class="overflow-x-auto">
+    <table class="table table-zebra w-full min-w-[1200px]">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>予約日</th>
+          <th>時間</th>
+          <th>受取</th>
+          <th>予約者氏名</th>
+          <th>電話</th>
+          <th>選択商品</th>
+          <th>数量</th>
+          <th>合計金額</th>
+
+          {{-- ▼ shipping.blade.php で入力できる主な項目を列として表示 --}}
+          <th>配送先氏名</th>
+          <th>会社</th>
+          <th>店舗</th>
+          <th>エリア</th>
+          <th>郵便</th>
+          <th>住所</th>
+          <th>備考</th>
+
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        @foreach ($reservations as $r)
+          @php
+            $slot = $r->slot;
+            $date = optional($slot?->slot_date) ? \Illuminate\Support\Carbon::parse($slot->slot_date)->format('Y-m-d') : '';
+            $start = $slot?->start_time ? \Illuminate\Support\Str::of($slot->start_time)->limit(5,'') : '';
+            $end   = $slot?->end_time   ? \Illuminate\Support\Str::of($slot->end_time)->limit(5,'')   : '';
+            $method = $slot?->slot_type === 'delivery' ? '配送' : '店頭';
+
+            // 予約者名は優先順：guest_name → customer.name → 'ー'
+            $guestName  = $r->guest_name ?: ($r->customer->name ?? 'ー');
+            $guestPhone = $r->guest_phone ?: ($r->customer->phone ?? 'ー');
+
+            // shipping_json は array キャスト済み
+            $sx = $r->shipping_json ?? [];
+          @endphp
+          <tr>
+            <td class="whitespace-nowrap">{{ $r->id }}</td>
+            <td class="whitespace-nowrap">{{ $date }}</td>
+            <td class="whitespace-nowrap">{{ $start }}{{ $end ? ' - '.$end : '' }}</td>
+            <td class="whitespace-nowrap">
+              <span class="badge">{{ $method }}</span>
+            </td>
+            <td class="whitespace-nowrap">{{ $guestName }}</td>
+            <td class="whitespace-nowrap">{{ $guestPhone }}</td>
+            <td class="whitespace-nowrap">
+              {{ $r->product?->name ?? '—' }}
+            </td>
+            <td class="whitespace-nowrap text-right">{{ $r->quantity }}</td>
+            <td class="whitespace-nowrap text-right">{{ number_format((int)$r->total_amount) }}円</td>
+
+            {{-- ▼ shipping 情報 --}}
+            <td class="whitespace-nowrap">{{ $sx['recipient_name'] ?? '—' }}</td>
+            <td class="whitespace-nowrap">{{ $sx['recipient_company'] ?? '—' }}</td>
+            <td class="whitespace-nowrap">{{ $sx['recipient_store'] ?? '—' }}</td>
+            <td class="whitespace-nowrap">
+              {{-- DBのdelivery_area(enum)は英字、見せるのは日本語優先 --}}
+              {{ $sx['area_jp'] ?? match($r->delivery_area){
+                  'namie'=>'浪江','futaba'=>'双葉','okuma'=>'大熊','odaka'=>'小高区', default => '—'
+              } }}
+            </td>
+            <td class="whitespace-nowrap">{{ $sx['postal_code'] ?? ($r->delivery_postal_code ?? '—') }}</td>
+            <td class="whitespace-nowrap">{{ $sx['address'] ?? ($r->delivery_address ?? '—') }}</td>
+            <td class="max-w-[280px]">
+              <div class="truncate" title="{{ $sx['notes'] ?? $r->notes }}">
+                {{ $sx['notes'] ?? $r->notes ?? '—' }}
+              </div>
+            </td>
+
+            <td class="whitespace-nowrap">
+              <a href="{{ route('admin.reservations.show', $r) }}" class="btn btn-xs">詳細</a>
+            </td>
+          </tr>
         @endforeach
-      </select>
+      </tbody>
+    </table>
+  </div>
 
-      <input type="date" class="input input-bordered" name="from" value="{{ request('from') }}" placeholder="日付From">
-      <input type="date" class="input input-bordered" name="to"   value="{{ request('to')   }}" placeholder="日付To">
-
-      <button class="btn btn-primary">検索</button>
-      <a class="btn btn-ghost" href="{{ route('admin.reservations.index') }}">クリア</a>
-
-      <a class="btn btn-outline" href="{{ route('admin.reservations.export', request()->query()) }}">
-        CSVエクスポート
-      </a>
-    </div>
-  </form>
-  ▲▲▲ 非表示ここまで ▲▲▲ --}}
+  <div>
+    {{ $reservations->links() }}
+  </div>
 </div>
-
-{{-- 一括操作ボタン --}}
-<div class="flex items-center gap-2 mb-3">
-  <form id="bulk-delete-form" action="{{ route('admin.reservations.destroySelected') }}" method="POST" class="flex items-center gap-2">
-    @csrf
-    @method('DELETE')
-    <input type="hidden" name="ids" id="bulk-ids">
-    <button type="submit" class="btn btn-error" onclick="return confirm('選択した予約を削除します。よろしいですか？');">
-      選択削除
-    </button>
-  </form>
-
-  <form action="{{ route('admin.reservations.destroyAll') }}" method="POST" onsubmit="return confirmDeleteAll();" class="inline">
-    @csrf
-    @method('DELETE')
-    <button class="btn btn-outline btn-error">全件削除</button>
-  </form>
-</div>
-
-<div class="overflow-x-auto">
-  <table class="table table-zebra">
-    <thead>
-      <tr>
-        <th class="w-10">
-          <input type="checkbox" class="checkbox" id="select-all">
-        </th>
-        <th class="whitespace-nowrap">予約日</th>
-        <th class="whitespace-nowrap">時間</th>
-        <th class="whitespace-nowrap">受取</th>
-        <th class="whitespace-nowrap">予約者氏名</th>
-        <th class="whitespace-nowrap">選択商品</th>
-        <th class="whitespace-nowrap text-right">合計金額</th>
-        <th class="whitespace-nowrap text-right">操作</th>
-      </tr>
-    </thead>
-    <tbody>
-    @forelse ($reservations as $r)
-      @php
-        // ▼ スロット情報（slot_date: Carbon, start_time: "HH:MM:SS"）
-        $slot   = $r->slot;
-        $date   = $slot?->slot_date ? \Illuminate\Support\Carbon::parse($slot->slot_date)->format('Y-m-d') : '—';
-        $time   = $slot?->start_time ? substr((string)$slot->start_time, 0, 5) : '—';
-
-        // ▼ 受取方法はスロットの種別から（reservations.method は使わない）
-        $slotType    = $slot->slot_type ?? null; // 'store'|'delivery'
-        $methodLabel = match($slotType) {
-          'store' => '店頭',
-          'delivery' => '配達',
-          default => '—',
-        };
-
-        // ▼ 合計金額（存在する情報でフォールバック）
-        $amount = $r->total_amount
-          ?? ((isset($r->unit_price, $r->quantity)) ? ((int)$r->unit_price * (int)$r->quantity) : null)
-          ?? ($r->product->price ?? null);
-      @endphp
-      <tr>
-        <td>
-          <input type="checkbox" class="checkbox row-check" value="{{ $r->id }}">
-        </td>
-        <td>{{ $date }}</td>
-        <td>{{ $time }}</td>
-        <td>
-          @if($slotType === 'store')
-            <span class="badge badge-primary">店頭</span>
-          @elseif($slotType === 'delivery')
-            <span class="badge badge-secondary">配達</span>
-          @else
-            <span class="badge">—</span>
-          @endif
-        </td>
-        <td>{{ $r->guest_name ?? $r->customer_name ?? '—' }}</td>
-        <td>
-          @if($r->product)
-            <div class="flex items-center gap-2">
-              <span class="badge">{{ \Illuminate\Support\Str::limit($r->product->name, 20) }}</span>
-            </div>
-          @else
-            （商品未設定）
-          @endif
-        </td>
-        <td class="text-right font-semibold">
-          {{ isset($amount) ? number_format((int)$amount) . '円' : '—' }}
-        </td>
-        <td class="text-right">
-          <form action="{{ route('admin.reservations.destroy', $r) }}" method="POST" onsubmit="return confirm('この予約を削除します。よろしいですか？');" class="inline">
-            @csrf
-            @method('DELETE')
-            <button class="btn btn-sm btn-error">削除</button>
-          </form>
-        </td>
-      </tr>
-    @empty
-      <tr>
-        <td colspan="8" class="text-center text-gray-500">該当する予約はありません</td>
-      </tr>
-    @endforelse
-    </tbody>
-  </table>
-</div>
-
-<div class="mt-4">
-  {{ $reservations->appends(request()->query())->links() }}
-</div>
-
-{{-- JS（最小限） --}}
-<script>
-  const selectAll = document.getElementById('select-all');
-  const checks = () => Array.from(document.querySelectorAll('.row-check'));
-  const bulkIds = document.getElementById('bulk-ids');
-  const bulkForm = document.getElementById('bulk-delete-form');
-
-  selectAll?.addEventListener('change', e => {
-    checks().forEach(cb => cb.checked = e.target.checked);
-    setBulkIds();
-  });
-
-  document.addEventListener('change', e => {
-    if (e.target.classList?.contains('row-check')) setBulkIds();
-  });
-
-  function setBulkIds() {
-    const ids = checks().filter(cb => cb.checked).map(cb => cb.value);
-    bulkIds.value = ids.join(',');
-  }
-
-  function confirmDeleteAll() {
-    if (!confirm('【危険】予約を全件削除します。よろしいですか？')) return false;
-    return confirm('本当に全件削除しますか？この操作は取り消せません。');
-  }
-</script>
 @endsection

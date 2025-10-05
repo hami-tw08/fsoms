@@ -40,6 +40,7 @@ class Reservation extends Model
         // ── スロット直結型で使うフィールド（Controller側の create() 相当で利用）──
         'slot_id',
         'user_id',
+        'customer_id',   // ★ 追記：顧客リレーション用
         'product_id',
         'quantity',
         'total_amount',           // スロット型の合計
@@ -49,6 +50,8 @@ class Reservation extends Model
         'delivery_address',
         'guest_name',
         'guest_phone',
+        // ★ 追記：shipping_json を保存できるように（DBにカラムがある前提）
+        'shipping_json',
     ];
 
     protected $casts = [
@@ -56,6 +59,7 @@ class Reservation extends Model
         'receive_time' => 'string',
         'quantity'     => 'integer',
         'total_amount' => 'integer',
+        'shipping_json' => 'array',
     ];
 
     /**
@@ -111,6 +115,14 @@ class Reservation extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id');
+    }
+
+    /**
+     * ★ 追記：顧客（customers）リレーション
+     */
+    public function customer(): BelongsTo
+    {
+        return $this->belongsTo(Customer::class, 'customer_id');
     }
 
     /* =========================

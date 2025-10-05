@@ -273,22 +273,43 @@ class CheckoutController extends Controller
 
                     DB::table('reservations')->insert([
                         'slot_id'      => $slot->id,
-                        'user_id'      => $userId, // ★ ここで利用
+                        'user_id'      => $userId,
+
+                        // 顧客IDは別でひもづけ済み（customers）
                         'customer_id'  => $customerId,
+
                         'product_id'   => $productId,
                         'quantity'     => $qty,
-                        'total_amount' => $price * $qty, // decimal(10,2) に整数円で投入OK
+                        'total_amount' => $price * $qty,
                         'status'       => 'booked',
                         'notes'        => $shipping['notes'] ?? null,
 
-                        // 配達関連（配達時のみ）
+                        // ▼▼ ここが重要：注文者（=旧 guest_* として保存しておく）
+                        'guest_name'   => $shipping['orderer_name']  ?? null,
+                        'guest_phone'  => $shipping['orderer_phone'] ?? null,
+
+                        // ▼ 配達関連（DBの既存カラム）
                         'delivery_area'        => $isDelivery ? $deliveryAreaEnum : null,
                         'delivery_postal_code' => $isDelivery ? ($shipping['postal_code'] ?? null) : null,
                         'delivery_address'     => $isDelivery ? ($shipping['address'] ?? null)      : null,
 
+                        // ▼ 追加：お客さま入力を丸ごと保存（店頭でも配達でも）
+                        'shipping_json' => json_encode([
+                            'orderer_name'     => $shipping['orderer_name']  ?? null,
+                            'orderer_phone'    => $shipping['orderer_phone'] ?? null,
+                            'recipient_name'   => $shipping['recipient_name']   ?? null,
+                            'recipient_company'=> $shipping['recipient_company'] ?? null,
+                            'recipient_store'  => $shipping['recipient_store']   ?? null,
+                            'area_jp'          => $shipping['area'] ?? null, // JP表示用に保持
+                            'postal_code'      => $shipping['postal_code'] ?? null,
+                            'address'          => $shipping['address'] ?? null,
+                            'notes'            => $shipping['notes'] ?? null,
+                        ], JSON_UNESCAPED_UNICODE),
+
                         'created_at' => now(),
                         'updated_at' => now(),
                     ]);
+
                 }
             });
 
