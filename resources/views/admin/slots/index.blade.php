@@ -1,5 +1,5 @@
 {{-- resources/views/admin/slots/index.blade.php --}}
-@extends('layouts.daisy')
+@extends('layouts.admin')
 @section('title','スロット管理')
 @section('content')
 <div class="max-w-5xl mx-auto space-y-4">

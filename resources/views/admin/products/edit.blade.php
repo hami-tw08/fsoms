@@ -1,4 +1,4 @@
-@extends('layouts.app')
+@extends('layouts.admin')
 @section('content')
 <div class="max-w-4xl mx-auto p-6 space-y-6">
   <h1 class="text-2xl font-bold">商品を編集</h1>
