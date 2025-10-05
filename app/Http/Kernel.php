@@ -49,5 +49,6 @@ class Kernel extends HttpKernel
         'signed'    => \Illuminate\Routing\Middleware\ValidateSignature::class,
         'throttle'  => \Illuminate\Routing\Middleware\ThrottleRequests::class,
         'bindings'  => \Illuminate\Routing\Middleware\SubstituteBindings::class,
+        'reserve.block_return' => \App\Http\Middleware\BlockReturnToCreateDuringFlow::class,
     ];
 }

@@ -70,6 +70,9 @@ Route::post('/checkout/place', [CheckoutController::class, 'place'])->name('chec
 // 完了画面
 Route::get('/checkout/complete', [CheckoutController::class, 'complete'])->name('checkout.complete');
 
+// ★ 完了画面から新規開始（セッション初期化 → /reserve へ）
+Route::post('/reserve/reset', [ReservationController::class, 'reset'])->name('reserve.reset');
+
 /** 認証後ページ */
 Route::get('/dashboard', fn () => view('dashboard'))->middleware(['auth', 'verified'])->name('dashboard');
 

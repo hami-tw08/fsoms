@@ -7,6 +7,7 @@ use App\Models\Product;
 use App\Models\Reservation;
 use App\Models\ReservationSlot;
 use Illuminate\Http\Request;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
@@ -136,8 +137,8 @@ class ReservationController extends Controller
      */
 // app/Http/Controllers/ReservationController.php
 
-public function store(StoreReservationRequest $request)
-{
+    public function store(StoreReservationRequest $request)
+    {
     $slot = ReservationSlot::findOrFail($request->slot_id);
 
     // 3日前ガード
@@ -190,7 +191,7 @@ public function store(StoreReservationRequest $request)
             ->route('reserve.create', ['month' => $request->query('month')])
             ->with('status', '予約を作成しました！');
     });
-}
+    }
 
 
     /**
@@ -281,7 +282,29 @@ public function store(StoreReservationRequest $request)
                 's.end_time',
                 DB::raw('GREATEST(s.capacity - COUNT(r.id), 0) as remaining'),
             ]);
-
+        
         return response()->json($rows);
+    }
+
+    public function reset(Request $request)
+    {
+        // フロー制御系を解除（←これが重要）
+        $request->session()->forget([
+            'reservation.flow_locked',
+            'reservation.slot_id',
+            'reservation.slot_type',
+        ]);
+
+        // カート/チェックアウト系を掃除
+        $request->session()->forget([
+            'reservation.cart',
+            'reservation.meta',
+            'reservation.shipping',
+            'reservation.completed',
+            'cart.items', // 旧キー互換
+        ]);
+
+        return redirect()->route('reserve.create')
+            ->with('status', '予約を承りました。別日時の予約をご希望でしたらフォームからご入力ください。');
     }
 }

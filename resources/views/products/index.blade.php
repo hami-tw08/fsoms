@@ -60,8 +60,6 @@
   @endif
 </div>
 
-
-
   @if($products->isEmpty())
     <div class="alert alert-warning">現在、販売中の商品はありません。</div>
   @else
@@ -91,5 +89,12 @@
       @endforeach
     </div>
   @endif
+
+  @if(session('reservation.flow_locked'))
+  <div class="alert alert-warning mb-4 text-sm">
+    現在の予約フローが進行中です。別日を選ぶ場合は、<b>「ご予約完了」画面の「別の日程で新しく予約する」</b>からお願いします。途中で戻るとカート内容が失われる可能性があります。
+  </div>
+  @endif
+
 </div>
 @endsection

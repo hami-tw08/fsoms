@@ -50,9 +50,13 @@
       メールアドレス：<span class="font-semibold">test@example.com</span>　
       電話：<span class="font-semibold">080-xxxx-xxxx</span>
     </p>
-    <div class="mt-6">
-      <a href="{{ route('reserve.create') }}" class="btn btn-primary">トップページへ</a>
-    </div>
+    <!-- <div class="mt-6"> -->
+      <!-- <a href="{{ route('reserve.create') }}" class="btn btn-primary">トップページへ</a>
+    </div> -->
+    <form method="POST" action="{{ route('reserve.reset') }}" class="mt-6">
+    @csrf
+    <button class="btn btn-primary">トップページへ</button>
+    </form>
   </div>
 
   @php
