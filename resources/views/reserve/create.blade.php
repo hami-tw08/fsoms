@@ -235,7 +235,7 @@
               <select id="method" class="select select-bordered" disabled>
                 <option value="" selected>選択してください</option>
                 <option value="store">店頭受取</option>
-                <option value="delivery">配達</option>
+                <option value="delivery">配送　《次の画面で4,000円以上の商品を選択ください》</option>
               </select>
             </div>
             <div class="form-control">
