@@ -59,20 +59,6 @@
     </div>
   </div>
 
-
-    {{-- スマホ：画像の下にメッセージ＋添付テキストを表示（崩れ防止） --}}
-    <div class="md:hidden mt-3">
-      <div class="bg-base-100 shadow-xl rounded-box px-4 py-3 space-y-3">
-        <div>
-          <div class="text-base font-bold mb-1">当店について</div>
-          <div class="text-sm leading-relaxed">
-            2027年に浪江でオープンした、1人で切り盛りする小さい花屋です。<br>
-            お花をご覧になるのみでも大歓迎！お気軽にお越しください。<br>
-            お求めの予定が決まっている場合は、<span class="font-bold">オンライン予約</span>をオススメします。<br>
-            なお、配送中はお店を閉めますので、ご来店の際は下記開店時間をご参照願います。
-          </div>
-        </div>
-
         <hr class="opacity-20">
 
         <!-- {{-- 添付テキスト：スマホでもPCでも常に表示（必要に応じて編集OK） --}} -->
