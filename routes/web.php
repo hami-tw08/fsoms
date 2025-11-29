@@ -107,8 +107,19 @@ Route::middleware(['auth', IsAdmin::class])
         Route::get('/slots', [AdminSlotController::class, 'index'])->name('slots.index');             // 一覧＆編集フォーム
         Route::post('/slots/bulk-update', [AdminSlotController::class, 'bulkUpdate'])->name('slots.bulk-update'); // 一括更新
 
+        // ▼ 今すぐ再生成（5か月先まで）※管理画面の手動ボタン用
+        Route::post('/slots/generate-now', function () {
+            \Artisan::call('slots:generate-monthly', [
+                '--months' => 5,
+                '--shop' => 1,
+                '--from-first-of-month' => true,
+            ]);
+            return back()->with('status', '5か月先までの枠を再生成しました');
+        })->name('slots.generate-now');
+
         // 商品管理
         Route::resource('products', AdminProductController::class)->except(['show']);
     });
 
 require __DIR__ . '/auth.php';
+

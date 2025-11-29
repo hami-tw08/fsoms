@@ -31,8 +31,8 @@ class DatabaseSeeder extends Seeder
         $calls = [
             AdminUserSeeder::class,
             ProductSeeder::class,
-            ReservationSlotSeeder::class,
-            ReservationSeeder::class,
+            // GenerateMonthlySlotsSeeder::class,
+            // ReservationSeeder::class,
         ];
 
         // DeliveryAreaSeeder がある場合は AdminUserSeeder の直後へ差し込み
