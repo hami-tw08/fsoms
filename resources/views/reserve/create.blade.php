@@ -24,10 +24,10 @@
            class="w-full h-auto object-contain">
     </div>
 
-    {{-- md+：固定高＋cover＋オーバーレイ --}}
-    <div class="hidden md:block relative h-80 lg:h-96 rounded-2xl overflow-hidden">
+    {{-- md+：高さは画像に任せて、画像は全体表示（トリミングしない） --}}
+    <div class="hidden md:block relative rounded-2xl overflow-hidden bg-[#F7D56A]">
       <img src="{{ asset('img/top-image3.png') }}" alt="トップイメージ"
-           class="absolute inset-0 w-full h-full object-cover">
+           class="w-full h-auto object-contain">
       <div class="absolute left-6 bottom-6">
         <div class="bg-base-100/90 backdrop-blur shadow-xl rounded-box px-6 py-4 max-w-[52rem]">
           <div class="text-lg font-bold mb-1">当店について</div>
@@ -40,7 +40,7 @@
         </div>
       </div>
     </div>
-  </div>
+
 
   {{-- スマホ：画像の下にメッセージ --}}
   <div class="md:hidden mt-3">
