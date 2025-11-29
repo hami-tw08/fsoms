@@ -17,36 +17,48 @@
   @endphp
 
   {{-- ヒーロー：キャッチ＋トップイメージ（md+はオーバーレイ、smは下に配置） --}}
-  <!-- <div class="mb-8"> -->
-    <!-- <h1 class="text-xl md:text-2xl font-bold leading-tight mb-3"> -->
-      <!-- 日々の暮らしに添える花<br class="hidden sm:block">大切な方に贈る花 -->
-    <!-- </h1> -->
+  <div class="mb-8">
+    {{-- スマホ：画像だけ全幅表示 --}}
+    <div class="md:hidden rounded-2xl overflow-hidden">
+      <img src="{{ asset('img/top-image3.png') }}" alt="トップイメージ"
+           class="w-full h-auto object-contain">
+    </div>
 
-{{-- 画像：スマホは全体表示、md+ はヒーロー演出 --}}
-<div class="rounded-2xl overflow-hidden">
-  {{-- sm（〜md-1）：横幅フィット＆全体表示 --}}
-  <img src="{{ asset('img/top-image3.png') }}" alt="トップイメージ"
-       class="block md:hidden w-full h-auto object-contain rounded-2xl">
-</div>
-
-
-      {{-- md+：固定高＋cover＋オーバーレイ --}}
-      <div class="hidden md:block relative h-80 lg:h-96">
-        <img src="{{ asset('img/top-image3.png') }}" alt="トップイメージ"
-             class="absolute inset-0 w-full h-full object-cover">
-        <div class="absolute left-6 bottom-6">
-          <div class="bg-base-100/90 backdrop-blur shadow-xl rounded-box px-6 py-4 max-w=[52rem] max-w-[52rem]">
-            <div class="text-lg font-bold mb-1">当店について</div>
-            <div class="text-sm leading-relaxed">
-              2027年に浪江でオープンした、1人で切り盛りする小さい花屋です。<br>
-              お花をご覧になるのみでも大歓迎！お気軽にお越しください。<br>
-              お求めの予定が決まっている場合は、<span class="font-bold">オンライン予約</span>をオススメします。<br>
-              なお、配送中はお店を閉めますので、ご来店の際は下記開店時間をご参照願います。
-            </div>
+    {{-- md+：固定高＋cover＋オーバーレイ --}}
+    <div class="hidden md:block relative h-80 lg:h-96 rounded-2xl overflow-hidden">
+      <img src="{{ asset('img/top-image3.png') }}" alt="トップイメージ"
+           class="absolute inset-0 w-full h-full object-cover">
+      <div class="absolute left-6 bottom-6">
+        <div class="bg-base-100/90 backdrop-blur shadow-xl rounded-box px-6 py-4 max-w-[52rem]">
+          <div class="text-lg font-bold mb-1">当店について</div>
+          <div class="text-sm leading-relaxed">
+            2027年に浪江でオープンした、1人で切り盛りする小さい花屋です。<br>
+            お花をご覧になるのみでも大歓迎！お気軽にお越しください。<br>
+            お求めの予定が決まっている場合は、<span class="font-bold">オンライン予約</span>をオススメします。<br>
+            なお、配送中はお店を閉めますので、ご来店の際は下記開店時間をご参照願います。
           </div>
         </div>
       </div>
     </div>
+  </div>
+
+  {{-- スマホ：画像の下にメッセージ --}}
+  <div class="md:hidden mt-3">
+    <div class="bg-base-100 shadow-xl rounded-box px-4 py-3 space-y-3">
+      <div>
+        <div class="text-base font-bold mb-1">当店について</div>
+        <div class="text-sm leading-relaxed">
+          2027年に浪江でオープンした、1人で切り盛りする小さい花屋です。<br>
+          お花をご覧になるのみでも大歓迎！お気軽にお越しください。<br>
+          お求めの予定が決まっている場合は、<span class="font-bold">オンライン予約</span>をオススメします。<br>
+          なお、配送中はお店を閉めますので、ご来店の際は下記開店時間をご参照願います。
+        </div>
+      </div>
+
+      <hr class="opacity-20">
+    </div>
+  </div>
+
 
     {{-- スマホ：画像の下にメッセージ＋添付テキストを表示（崩れ防止） --}}
     <div class="md:hidden mt-3">
